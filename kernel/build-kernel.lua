@@ -70,7 +70,7 @@ for _, sourcePath in pairs(sources) do
 						code = code:sub(0, s - 1) .. code:sub(e + 1)
 				end
 				if name == "config" then
-					code = code:gsub("rootfs = \"(.+)\"", fs)
+					code = code:gsub("rootfs = \"(.+)\"", "roofs=\""..fs.."\"")
 				end
 				module.code = code
 				module.name = name
