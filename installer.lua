@@ -51,7 +51,7 @@ function buildKernel()
 		downloadFile(fromGit("kernel/src/" .. file .. ".lua"), "kernel/src/" .. file .. ".lua")
 	end 
 	downloadFile(fromGit("kernel/build-kernel.lua"), "kernel/build-kernel.lua")
-	sh.execute("cd kernel; build-kernel; mv kernel.lua /mnt/" .. fsAddress:sub(1, 3) .. "/init.lua")
+	sh.execute("cd kernel; build-kernel " .. fsAddress .. "; mv kernel.lua /mnt/" .. fsAddress:sub(1, 3) .. "/init.lua")
 end
 
 function copyRoot()
