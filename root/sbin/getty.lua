@@ -78,7 +78,6 @@ controls = {
 	["[2J"] = function()
 		cx, cy = 1, 1
 		component.invoke(gpu, "fill", 1, 1, w, h, " ")
-		dprint("CLEAR!")
 	end
 }
 

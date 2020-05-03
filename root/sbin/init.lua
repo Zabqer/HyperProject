@@ -20,8 +20,7 @@ function createTty(gpu, screen)
 	--pi, po = io.pts()
 	local o1, i1 = io.pipe()
 	local o2, i2 = io.pipe()
-	keyboard = component.invoke(screen, "getKeyboards")[0]
-	dprint("createTty", gpu, screen, keyboard)
+	keyboard = component.invoke(screen, "getKeyboards")[1]
 	getty, reason = thread.createProcess("/sbin/getty.lua", _, gpu, screen, keyboard)
 	if not getty then
 		error(reason)
