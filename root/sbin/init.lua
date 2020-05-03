@@ -3,9 +3,6 @@ print("Initializing...")
 local event = require("event")
 local thread = require("thread")
 
-screen = component.list("screen")
-gpu = component.list("gpu")
-
 os.setenv("HOSTNAME", "myhost")
 
 
@@ -39,7 +36,7 @@ function createTty(gpu, screen)
 	io.stdout = o1
 	login:run()
 end
-
+--TODO handle component remove
 function eventHandler(_, address, type)
 	if type == "gpu" then
 		if #free_screens > 0 then
@@ -62,5 +59,5 @@ event.on("component_added", eventHandler)
 for address, ctype in component.list() do
     eventHandler(_, address, ctype)
 end
-
+--TODO replace os sleep
 os.sleep(9999999999999)

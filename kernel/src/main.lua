@@ -41,7 +41,7 @@ function main(...)
 			panic(reason)
 		end
 		init.workingDirectory = "/"
-		init.stdout = kernelLoggerhttps://raw.githubusercontent.com/Zabqer/HyperProject/master/installer.lua
+		init.stdout = kernelLogger
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
 
 		local lastYield = computer.uptime()

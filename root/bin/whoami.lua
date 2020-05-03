@@ -1,3 +1,3 @@
 local thread = require("thread")
 
-print(thread.thisThread():getInfo().user)
+print(thread.thisProcess():info().user)

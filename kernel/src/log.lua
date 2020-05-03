@@ -29,7 +29,7 @@ end
 kernelLogger = {
 	write = function (_, str)
  		-- TODO write to file after boot
-		--bootLogger(str)
+		bootLogger(str)
 	end
 }
 
@@ -37,6 +37,9 @@ function kernelLog(level, ...)
 		local args = table.pack(...)
 		for i = 1, #args do
 				args[i] = tostring(args[i])
+		end
+		if level < 1 then
+			return
 		end
 		kernelLogger:write(extend(level, table.unpack(args)))
 end
