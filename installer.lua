@@ -56,7 +56,40 @@ end
 
 function copyRoot()
 	print("Copying root")
-
+	local bin = {
+		"ps",
+		"whoami",
+		"echo",
+		"error",
+		"ls",
+		"tree",
+		"shutdown",
+		"sleep",
+		"signal",
+		"sh",
+		"clear"
+	}
+	local lib = {
+		"sh",
+		"term"
+	}
+	local sbin = {
+		"getty",
+		"init",
+		"login"
+	}
+	sh.execute("mkdir /mnt/" .. fsAddress:sub(1, 3) .. "/bin")
+	sh.execute("mkdir /mnt/" .. fsAddress:sub(1, 3) .. "/lib")
+	sh.execute("mkdir /mnt/" .. fsAddress:sub(1, 3) .. "/sbin")
+	for _, file in pairs(bin) do
+		downloadFile(fromGit("root/" .. file .. ".lua"), "/mnt" .. fsAddress:sub(1, 3) .. "/bin/" .. file .. ".lua")
+	end 
+	for _, file in pairs(lib) do
+		downloadFile(fromGit("root/lib/" .. file .. ".lua"), "/mnt" .. fsAddress:sub(1, 3) .. "/lib/" .. file .. ".lua")
+	end 
+	for _, file in pairs(sbin) do
+		downloadFile(fromGit("root/sbin/" .. file .. ".lua"), "/mnt" .. fsAddress:sub(1, 3) .. "/sbin/" .. file .. ".lua")
+	end 
 end
 
 buildKernel()
