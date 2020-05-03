@@ -27,11 +27,10 @@ function main(...)
 		kernelLog(Log.DEBUG, "[main] Starting kernel")
 		kernelLog(Log.INFO, "HyperKernel / " .. KernelVersion .. " / Zabqer")
 		kernelLog(Log.INFO, "[main] Mounting root filesystem")
-		success, reason = filesystem.mount("/", Config.rootfs)
+		success, reason = filesystem.mount("/", computer.getBootAddress())
 		if not success then
 			panic(reason)
 		end
-		--, computer.getBootAddress())
 		kernelLog(Log.DEBUG, "[main] Spawning init thread")
 		local init, reason = createProcess(function ()
 				kernelLog(Log.DEBUG, "[init] Init started")
@@ -128,7 +127,6 @@ function main(...)
 			::yieldMachine::
 			local deadline = nextDeadline()
 			local event = table.pack(computer.pullSignal(math.max(0, computer.uptime() - deadline)))
-			error(event[1])
 			lastYield = computer.uptime()
 			if #event > 0 then
 				for _, thread in pairs(threads) do
