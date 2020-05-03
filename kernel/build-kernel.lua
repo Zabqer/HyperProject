@@ -23,7 +23,7 @@ local sources = {
 		"src/user.lua",
 		"src/filesystem.lua",
 		"src/threading.lua",
-		"src/userspace.lua",
+		--"src/userspace.lua",
 		"src/buffer.lua",
 		"src/main.lua"
 }

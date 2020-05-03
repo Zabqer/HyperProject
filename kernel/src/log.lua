@@ -28,7 +28,8 @@ end
 
 kernelLogger = {
 	write = function (_, str)
- 		bootLogger(str)
+ 		-- TODO write to file after boot
+		--bootLogger(str)
 	end
 }
 
@@ -69,9 +70,13 @@ if gpu and screen then
                             for s in str:gmatch("[^\r\n]+") do
                                     ss = ss .. s
                                     while #ss > 0 do
-                                                    local line = unicode.wtrunc(ss, w)
-                                                    drawLine(line)
-                                                    ss = unicode.sub(ss, unicode.len(line) + 1)
+					if unicode.len(ss) > w then
+						line = unicode.wtrunc(ss, w)
+                                        else
+                                        	line = ss
+                                        end
+                                        drawLine(line)
+                                        ss = unicode.sub(ss, unicode.len(line) + 1)
                                    end
                            end
 		end
