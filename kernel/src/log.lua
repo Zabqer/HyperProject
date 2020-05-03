@@ -29,7 +29,7 @@ end
 kernelLogger = {
 	write = function (_, str)
  		-- TODO write to file after boot
-		bootLogger(str)
+		--bootLogger(str)
 	end
 }
 

@@ -12,7 +12,7 @@ function processTree(path, isdir, a, b)
 		io.write("\n")
 		local dirs = {}
 		local files = {}
-		for _, f in pairs(filesystem.list(path)) do
+		for _, f in ipairs(filesystem.list(path)) do
 			table.insert(filesystem.isDirectory(f) and dirs or files, f)
 		end
 		for i, f in pairs(dirs) do

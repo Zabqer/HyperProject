@@ -67,7 +67,6 @@ function createThread(f, name, process, paused, ...)
 			msg = msg or "unknown"
 			kernelLog(Log.INFO, "Error in thread [pid: " .. thread.pid .. "]: " .. msg)
 			kernelLog(Log.INFO, debug.traceback())
-			dprint(thread.process.name, thread.process.stderr)
 			if thread.process.stderr then
 					thread.process.stderr:write("Error in thread [pid: " .. thread.pid .. "]: " .. msg .. "\n")
 					thread.process.stderr:write(debug.traceback() .. "\n")
