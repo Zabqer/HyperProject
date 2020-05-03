@@ -1,7 +1,7 @@
 local term = {}
 
 function term.read(_, hint)
-	str = ""
+	local str = ""
 	while true do
 		local char = io.read(1)
 		if char == "\n" then
