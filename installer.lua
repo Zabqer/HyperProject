@@ -82,7 +82,7 @@ function copyRoot()
 	sh.execute("mkdir /mnt/" .. fsAddress:sub(1, 3) .. "/lib")
 	sh.execute("mkdir /mnt/" .. fsAddress:sub(1, 3) .. "/sbin")
 	for _, file in pairs(bin) do
-		downloadFile(fromGit("root/" .. file .. ".lua"), "/mnt/" .. fsAddress:sub(1, 3) .. "/bin/" .. file .. ".lua")
+		downloadFile(fromGit("root/bin/" .. file .. ".lua"), "/mnt/" .. fsAddress:sub(1, 3) .. "/bin/" .. file .. ".lua")
 	end 
 	for _, file in pairs(lib) do
 		downloadFile(fromGit("root/lib/" .. file .. ".lua"), "/mnt/" .. fsAddress:sub(1, 3) .. "/lib/" .. file .. ".lua")
