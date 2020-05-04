@@ -14,8 +14,9 @@ function libevent.on(event, f)
 	end, "[event listener]", thisThread.process)
 end
 
+-- TODO make event regexp
 function libevent.wait(event, ...)
-	return waitEvent("signal", event, ...)
+	return table.unpack(table.pack(waitEvent("signal", event, ...)), 2)
 end
 
 libs.event = libevent

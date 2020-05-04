@@ -18,13 +18,20 @@ function createTty(gpu, screen)
 	local o1, i1 = io.pipe()
 	local o2, i2 = io.pipe()
 	keyboard = component.invoke(screen, "getKeyboards")[1]
-	getty, reason = thread.createProcess("/sbin/getty.lua", _, gpu, screen, keyboard)
+	-- TODO maybe combine readkey and getty?
+	readkey, reason = thread.createProcess("/sbin/readkey.lua", _, keyboard)
+	if not readkey then
+		error(reason)
+	end
+	local io = readkey.IO()
+	io.stdout = o2
+	readkey:run()
+	getty, reason = thread.createProcess("/sbin/getty.lua", _, gpu, screen)
 	if not getty then
 		error(reason)
 	end
-	local io = getty.IO()
+	io = getty.IO()
 	io.stdin = i1
-	io.stdout = o2
 	getty:run()
 	login, reason = thread.createProcess("/sbin/login.lua", _, i)
 	i = i + 1
