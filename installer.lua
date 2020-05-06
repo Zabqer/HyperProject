@@ -33,6 +33,10 @@ end
 function buildKernel()
 	print("Building kernel")	
 	local files = {
+		"allocator",
+		"component",
+		"dev_filesystem",
+		"driver_chatbox",
 		"buffer",
 		"config",
 		"event",
