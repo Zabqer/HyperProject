@@ -96,13 +96,15 @@ function kill(pid)
 			kill(th.pid)
 		end
 		processes[pid] = nil
-		local index
-		for i, p in pairs(thread.process.parent.processes) do
-			if p.pid == pid then
-				index = i
+		if thread.process.parent then
+			local index
+			for i, p in pairs(thread.process.parent.processes) do
+				if p.pid == pid then
+					index = i
+				end
 			end
+			table.remove(thread.process.parent.processes, index)
 		end
-		table.remove(thread.process.parent.processes, index)
 	else
 		local index
 		for i, th in pairs(thread.process.threads) do
