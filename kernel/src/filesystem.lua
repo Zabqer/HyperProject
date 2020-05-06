@@ -4,7 +4,7 @@
 		Description: Provides virtual filesystem methods;
 ]]--
 
-local mounts = {}
+local rootNode = {name="", nodes={}}
 
 filesystem = {}
 
@@ -60,25 +60,100 @@ function PathMethods:remove(index)
 		end
 end
 
+function PathMethods:pairs()
+	return pairs(self.segments)
+end
+
+function PathMethods:at(index)
+	checkArg(1, index, "number")
+	if index > 0 and index <= #self.segments then
+		return self.segments[index]
+	end
+end
+
 local function Path(path)
 		local obj = {}
 		obj.segments, obj.absolute = segmentate(path)
 		return protectObject(obj, PathMethods, "FilesystemPath")
 end
 
-local function getFilesystem(path)
-		local fspath = Path("")
-		path = Path(path)
-		while true do
-				if mounts[path.absolute()] then
-						return mounts[path.absolute()].driver, fspath.absolute()
-				end
-				if #path == 0 then
-						return nil, "no mounted filesystems"
-				end
-				fspath:append(path:remove(), 0)
+local function getNode(path)
+	-- Maybe rewrite?
+	path = type(path) == "string" and Path(path) or path
+	local outerpath = Path("")
+	local node = rootNode
+	while true do
+		local nextNodeName = path:at(1)
+		if not nextNodeName then
+			return node, outerpath
 		end
+		local nextNode
+		for _, n in pairs(node.nodes) do
+			if n.name == nextNodeName then
+				nextNode = n
+			end
+		end
+		if not nextNode then
+			for _, f in pairs(path) do
+				outerpath:append(f)
+			end
+			return node, outerpath
+		end
+		node = nextNode
+		outerpath:append(path:remove(1), 1)
+	end
 end
+
+local function printNodes(node, i)
+	i = i or 0
+	dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
+	for _, n in pairs(node.nodes) do
+		printNodes(n, i + 1)
+	end
+end
+
+local function createNode(node, path)
+	for _, f in pairs(path) do
+		local n = {name = f, nodes={}}
+		table.insert(node.nodes, n)
+		node = n
+	end
+	return node
+end
+
+-- local function getFilesystem(path)
+-- 		local fspath = Path("")
+-- 		path = Path(path)
+-- 		dprint(path.absolute())
+-- 		local node = nodes
+-- 		function findNode(nodes, name)
+-- 			for _, node in pairs(nodes) do
+-- 				if node.name == name then
+-- 					return node
+-- 				end
+-- 			end
+-- 			return nil
+-- 		end
+-- 		local node = rootNode
+-- 		while true do
+-- 			local name = path:remove(1)
+-- 			fspath:append(name)
+-- 			local nnode = findNode(node.nodes, name)
+-- 			if not nnode then
+-- 				return node.driver, fspath.absolute()
+-- 			end
+-- 			node = nnode
+-- 		end
+-- 		-- while true do
+-- 		-- 		if mounts[path.absolute()] then
+-- 		-- 				return mounts[path.absolute()].driver, fspath.absolute()
+-- 		-- 		end
+-- 		-- 		if #path == 0 then
+-- 		-- 				return nil, "no mounted filesystems"
+-- 		-- 		end
+-- 		-- 		fspath:append(path:remove(), 0)
+-- 		-- end
+-- end
 
 local filesystemHandle = {}
 
@@ -91,46 +166,61 @@ function filesystemHandle:close()
 		return self.driver.close(self.handle)
 end
 
-function filesystem.mount(path, address)
+function filesystem.mount(path, proxy)
 		checkArg(1, path, "string")
-		checkArg(2, address, "string")
-		path = Path(path).string()
-		if mounts[path] then
+		checkArg(2, proxy, "string", "table")
+		path = Path(path)
+		local node, fspath = getNode(path)
+		if #fspath == 0 and node.drive then
 				return false, "another file system mounted here"
 		end
-		mounts[path] = {
-				driver = component.proxy(address)
-		}
-		kernelLog(Log.DEBUG, "Filesystem", address, "mounted at", path)
+		node = createNode(node, path)
+		node.driver = type(proxy) == "table" and proxy or component.proxy(proxy)
+		-- push string to filesystem component, but to own drivers we push Path
+		node.kernel_driver = type(proxy) == "table"
+		kernelLog(Log.INFO, "Filesystem", proxy, "mounted at", path.string())
 		return true
 end
 
 function filesystem.exists(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-		if not driver then
-				return false
+		local node, fspath = getNode(path)
+		if not node then
+			return false
 		end
-		return driver.exists(path)
+		return node.driver.exists(node.kernel_driver and fspath or fspath.string())
 end
 
 function filesystem.isDirectory(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-		if not driver then
+		local node, fspath = getNode(path)
+		if not node then
 				return false
 		end
-		return driver.isDirectory(path)
+		return node.driver.isDirectory(node.kernel_driver and fspath or fspath.string())
 end
 
 
 function filesystem.list(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-                if not driver then
+		local node, fspath = getNode(path)
+                if not node then
 			return false
 		end
-        	return driver.list(path)
+		local files = {}
+		if #fspath == 0 then
+			for _, n in pairs(node.nodes) do
+				table.insert(files, n.name)
+			end
+		end
+
+        	local fsfiles = node.driver.list(node.kernel_driver and fspath or fspath.string())
+		if fsfiles then
+			for _, f in pairs(fsfiles) do
+				table.insert(files, f)
+			end
+		end
+		return files
 end
 
 function filesystem.open(path, mode)
@@ -138,21 +228,23 @@ function filesystem.open(path, mode)
 		mode = mode or "r"
 		checkArg(2, mode, "string")
 		assert(({r=true, rb=true, w=true, wb=true, a=true, ab=true})[mode], "bad argument #2 (r[b], w[b] or a[b] expected, got " .. mode .. ")")
-		local driver, path = getFilesystem(path)
-		if not driver then
+		local node, fspath = getNode(path)
+		if not node then
 				return nil, path
 		end
-		if ({r=true,rb=true})[mode] and not driver.exists(path) then
-				return nil, "file not found: " .. path
+		if ({r=true,rb=true})[mode] and not node.driver.exists(node.kernel_driver and fspath or fspath.string()) then
+				return nil, "file not found: " .. fspath.string()
 		end
-		local handle, reason = driver.open(path, mode)
+		local handle, reason = node.driver.open(node.kernel_driver and fspath or fspath.string(), mode)
 		if not handle then
 				return nil, reason
 		end
 		local stream = {
-				driver = driver,
+				kernel_driver = node.kernel_driver,
+				driver = node.driver,
 				handle = handle
 		}
+		-- TODO protect
 		return setmetatable(stream, {__index = filesystemHandle})
 end
 

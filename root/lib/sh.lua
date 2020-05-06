@@ -104,7 +104,7 @@ end
 sh.buildin = {}
 
 function sh.buildin.cd(path)
-	thread.thisThread().setWorkingDirectory(path)
+	thread.thisProcess():setWorkingDirectory(path)
 end
 
 function sh.resolve(name)

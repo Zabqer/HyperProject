@@ -47,6 +47,9 @@ function protectObject(object, methods, name)
 				end,
 				__len = methods.len and function ()
 						return methods.len(object)
+				end,
+				__pairs = methods.pairs and function ()
+					return methods.pairs(object)
 				end
 		})
 end
@@ -236,7 +239,368 @@ function GLOBAL.require(name)
 end
 ;
 
-local mounts = {}
+kernelThread = {
+	name = "kernel",
+	deadline = 0,
+}
+
+thisThread = kernelThread
+
+local nextPID, nextUID = 1, 1
+
+function allocateIds()
+	local pid, uid = nextPID, nextUID
+	nextUID = nextUID + 1
+	repeat
+		nextPID = nextPID + 1
+	until not threads[nextPID]
+	return pid, uid
+end
+
+threads = {}
+processes = {}
+
+function createProcess(f, name, parent, user, paused, ...)
+	local process = {
+		name = name,
+		processes = {},
+		threads = {},
+		parent = parent,
+		user = user,
+		workingDirectory = "/",
+		envvar = parent and setmetatable({}, {__index=parent.envvar}) or {}
+	}
+	if parent then
+		table.insert(parent.processes, process)
+	end
+	local th, reason = createThread(f, name, process, paused, ...)
+	if not th then
+		return nil, reason
+	end
+	process.pid = process.thread.pid
+	process.uid = process.thread.uid
+	processes[process.pid] = process
+	kernelLog(Log.DEBUG, "Created process pid:", process.pid, "name:", process.name)
+	return process
+end
+
+function createThread(f, name, process, paused, ...)
+	local thread = {
+		name = name or "unknown",
+		running = false,
+		paused = paused or false,
+		process = process,
+		deadline = computer.uptime(),
+		eventQueue = {{"args", ...}},
+		awaiting = "args"
+	}
+	thread.coroutine = coroutine.create(function (...)
+		local args = table.pack(...)
+		local result = table.pack(xpcall(function()
+			f(table.unpack(args))
+		end, function(msg)
+			msg = msg or "unknown"
+			kernelLog(Log.INFO, "Error in thread [pid: " .. thread.pid .. "]: " .. msg)
+			kernelLog(Log.INFO, debug.traceback())
+			if thread.process.stderr then
+					thread.process.stderr:write("Error in thread [pid: " .. thread.pid .. "]: " .. msg .. "\n")
+					thread.process.stderr:write(debug.traceback() .. "\n")
+			end
+		end))
+		return table.unpack(result, 2)
+	end)
+	if not process.thread then
+		process.thread = thread
+	else
+		table.insert(process.threads, thread)
+	end
+	thread.pid, thread.uid = allocateIds()
+	threads[thread.pid] = thread
+	kernelLog(Log.DEBUG, "Created thread pid:", thread.pid, "name:", thread.name, "run:", not paused)
+	return thread
+end
+
+function kill(pid)
+	local thread = threads[pid]
+ 	kernelLog(Log.DEBUG, "Killed", thread.process.thread == thread and "process" or "thread", "pid:", thread.pid, "name:", thread.name)
+	if thread.process.thread == thread then
+		for _, th in pairs(thread.process.threads) do
+			kill(th.pid)
+		end
+		for _, p in pairs(thread.process.processes) do
+			kill(th.pid)
+		end
+		processes[pid] = nil
+		local index
+		for i, p in pairs(thread.process.parent.processes) do
+			if p.pid == pid then
+				index = i
+			end
+		end
+		table.remove(thread.process.parent.processes, index)
+	else
+		local index
+		for i, th in pairs(thread.process.threads) do
+			if th.pid == pid then
+				index = i
+			end
+		end
+		table.remove(thread.process.threads, index)
+	end
+	if pid < nextPID then
+		nextPID = pid
+	end
+	pushEvent("kill", pid)
+	threads[pid] = nil
+end
+
+function pushEvent(name, ...)
+	for _, thread in pairs(threads) do
+		if thread.awaiting == name then
+			table.insert(thread.eventQueue, table.pack(name, ...))
+		end
+	end
+end
+
+function waitEvent(name, ...)
+	local args
+	while true do
+		::wait::
+		args = table.pack(coroutine.yield(name))
+		for i, arg in ipairs(table.pack(...)) do
+			if arg ~= nil and arg ~= args[i] then
+				goto wait
+			end
+		end
+		return name, table.unpack(args)
+	end
+end
+
+local eventHandlers = {}
+
+function addKenrelEventHandler(data, callback)
+	kernelLog(Log.DEBUG, "Registered kernel event handler for", table.unpack(data))
+	table.insert(eventHandlers, {
+		data = data,
+		callback = callback
+	})
+end
+
+local libthread = {}
+
+processMethods = {}
+local iosMethods = {}
+
+function processMethods:info()
+	local childs = {}
+	for _, th in pairs(self.process.threads) do
+		table.insert(childs, th.pid)
+	end
+	for _, p in pairs(self.process.processes) do
+		table.insert(childs, p.pid)
+	end
+	return protectTable({
+		pid = self.process.pid,
+		name = self.process.name,
+		user = self.process.user,
+		childs = childs,
+		process = true
+	}, true, false)
+end
+
+function processMethods:IO()
+	return setmetatable({}, {
+		__index = function (_, key)
+			if key == "stdout" then
+				return self.process.stdout
+			elseif key == "stdin" then
+				return self.process.stdin
+			elseif key == "stderr" then
+				return self.process.stderr
+			end
+			return nil
+		end,
+		__newindex = function (_, key, value)
+			if type(value) ~= "Stream" then
+				error("Not a stream")
+				return
+			end
+			if key == "stdout" then
+				self.process.stdout = value
+			elseif key == "stdin" then
+				self.process.stdin = value
+			elseif key == "stderr" then
+				self.process.stderr = value
+			end
+		end
+	})
+end
+
+function processMethods:run()
+	kernelLog(Log.DEBUG, "Process run pid:", self.process.pid, "name:", self.process.name)
+	self.process.thread.paused = false
+	for _, th in pairs(self.process.threads) do
+		th.paused = false
+	end
+end
+
+function processMethods:join()
+	waitEvent("kill", self.process.pid)
+end
+
+local threadMethods = {}
+
+function threadMethods:info()
+	return protectTable({
+		pid = self.thread.pid,
+		name = self.thread.name,
+		process = false
+	}, true, false)
+end
+
+function libthread.createProcess(f, name, ...)
+	checkArg(1, f, "string", "function")
+	if type(f) == "string" then
+		name = name or f
+		local reason
+		f, reason = loadfile(f)
+		if not f then
+			return nil, reason
+		end
+	end
+	local process = createProcess(f, name, thisThread.process, thisThread.process.user, true, ...)
+	return protectObject({
+		process = process
+	}, processMethods, "Process")
+end
+
+function libthread.thisProcess()
+	return protectObject({
+		process = thisThread.process
+	}, processMethods, "Process")
+end
+
+function libthread.createThread(f, name, ...)
+	checkArg(1, f, "function")
+	local th = createThread(f, name, thisThread.process, false, ...)
+end
+
+function libthread.byPid(pid)
+	checkArg(1, pid, "number")
+	if processes[pid] then
+		return protectObject({
+			process = processes[pid]
+		}, processMethods, "Process")
+	end
+	if threads[pid] then
+		return protectObject({
+			thread = threads[pid]
+		}, threadMethods, "Thread")
+	end
+	return nil, "no such process"
+end
+
+libs.thread = libthread
+;
+
+Log = {
+		DEBUG = 0,
+		INFO = 1,
+		WARNING = 2,
+		ERROR = 3
+}
+
+local levelName = {
+		[0] = "DEBUG",
+		[1] = "INFO",
+		[2] = "WARNING",
+		[3] = "ERROR"
+}
+
+local function extend(level, ...)
+		local str = ""
+		for _, s in pairs({...}) do
+				str = str .. " " .. s
+		end
+		local clock = math.floor(os.clock() * 1000) / 1000
+		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str
+end
+
+kernelLogger = {
+	write = function (_, str)
+ 		-- TODO write to file after boot
+		bootLogger(str)
+	end
+}
+
+function kernelLog(level, ...)
+		local args = table.pack(...)
+		for i = 1, #args do
+				args[i] = tostring(args[i])
+		end
+		if level < 1 then
+--			return
+		end
+		kernelLogger:write(extend(level, table.unpack(args)))
+end
+
+local gpu, screen = component.list("gpu")(), component.list("screen")()
+
+local invoke = component.invoke
+
+function bootLogger() end
+
+if gpu and screen then
+		invoke(gpu, "bind", screen)
+		local w, h = invoke(gpu, "getResolution")
+		local y = 0
+		invoke(gpu, "fill", 1, 1, w, h, " ")
+		local function drawLine(str)
+				if y == h then
+						invoke(gpu, "copy", 1, 2, w, h - 1, 0, -1)
+						invoke(gpu, "fill", 1, h, w, 1, " ")
+				else
+						y = y + 1
+				end
+				invoke(gpu, "set", 1, y, str)
+		end
+		function bootLogger(str)
+			str = str:gsub("\t", "  ")
+			if dprint then
+                        	dprint(str)
+			end
+			if true then
+				return
+			end
+                            local ss = ""
+                            for s in str:gmatch("[^\r\n]+") do
+                                    ss = ss .. s
+                                    while #ss > 0 do
+					if unicode.len(ss) > w then
+						line = unicode.wtrunc(ss, w)
+                                        else
+                                        	line = ss
+                                        end
+                                        drawLine(line)
+                                        ss = unicode.sub(ss, unicode.len(line) + 1)
+                                   end
+                           end
+		end
+end
+;
+
+local drivers = {}
+
+addKenrelEventHandler({"signal", "component_added"}, function (...)
+	dprint("COMPONENT ADDED!", ...)
+end)
+
+function register_driver(type, add_callback, remove_callback)
+	kernelLog(Log.DEBUG, "Register driver for", type)
+end
+;
+
+local rootNode = {name="", nodes={}}
 
 filesystem = {}
 
@@ -292,25 +656,100 @@ function PathMethods:remove(index)
 		end
 end
 
+function PathMethods:pairs()
+	return pairs(self.segments)
+end
+
+function PathMethods:at(index)
+	checkArg(1, index, "number")
+	if index > 0 and index <= #self.segments then
+		return self.segments[index]
+	end
+end
+
 local function Path(path)
 		local obj = {}
 		obj.segments, obj.absolute = segmentate(path)
 		return protectObject(obj, PathMethods, "FilesystemPath")
 end
 
-local function getFilesystem(path)
-		local fspath = Path("")
-		path = Path(path)
-		while true do
-				if mounts[path.absolute()] then
-						return mounts[path.absolute()].driver, fspath.absolute()
-				end
-				if #path == 0 then
-						return nil, "no mounted filesystems"
-				end
-				fspath:append(path:remove(), 0)
+local function getNode(path)
+	-- Maybe rewrite?
+	path = type(path) == "string" and Path(path) or path
+	local outerpath = Path("")
+	local node = rootNode
+	while true do
+		local nextNodeName = path:at(1)
+		if not nextNodeName then
+			return node, outerpath
 		end
+		local nextNode
+		for _, n in pairs(node.nodes) do
+			if n.name == nextNodeName then
+				nextNode = n
+			end
+		end
+		if not nextNode then
+			for _, f in pairs(path) do
+				outerpath:append(f)
+			end
+			return node, outerpath
+		end
+		node = nextNode
+		outerpath:append(path:remove(1), 1)
+	end
 end
+
+local function printNodes(node, i)
+	i = i or 0
+	dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
+	for _, n in pairs(node.nodes) do
+		printNodes(n, i + 1)
+	end
+end
+
+local function createNode(node, path)
+	for _, f in pairs(path) do
+		local n = {name = f, nodes={}}
+		table.insert(node.nodes, n)
+		node = n
+	end
+	return node
+end
+
+-- local function getFilesystem(path)
+-- 		local fspath = Path("")
+-- 		path = Path(path)
+-- 		dprint(path.absolute())
+-- 		local node = nodes
+-- 		function findNode(nodes, name)
+-- 			for _, node in pairs(nodes) do
+-- 				if node.name == name then
+-- 					return node
+-- 				end
+-- 			end
+-- 			return nil
+-- 		end
+-- 		local node = rootNode
+-- 		while true do
+-- 			local name = path:remove(1)
+-- 			fspath:append(name)
+-- 			local nnode = findNode(node.nodes, name)
+-- 			if not nnode then
+-- 				return node.driver, fspath.absolute()
+-- 			end
+-- 			node = nnode
+-- 		end
+-- 		-- while true do
+-- 		-- 		if mounts[path.absolute()] then
+-- 		-- 				return mounts[path.absolute()].driver, fspath.absolute()
+-- 		-- 		end
+-- 		-- 		if #path == 0 then
+-- 		-- 				return nil, "no mounted filesystems"
+-- 		-- 		end
+-- 		-- 		fspath:append(path:remove(), 0)
+-- 		-- end
+-- end
 
 local filesystemHandle = {}
 
@@ -323,46 +762,61 @@ function filesystemHandle:close()
 		return self.driver.close(self.handle)
 end
 
-function filesystem.mount(path, address)
+function filesystem.mount(path, proxy)
 		checkArg(1, path, "string")
-		checkArg(2, address, "string")
-		path = Path(path).string()
-		if mounts[path] then
+		checkArg(2, proxy, "string", "table")
+		path = Path(path)
+		local node, fspath = getNode(path)
+		if #fspath == 0 and node.drive then
 				return false, "another file system mounted here"
 		end
-		mounts[path] = {
-				driver = component.proxy(address)
-		}
-		kernelLog(Log.DEBUG, "Filesystem", address, "mounted at", path)
+		node = createNode(node, path)
+		node.driver = type(proxy) == "table" and proxy or component.proxy(proxy)
+		-- push string to filesystem component, but to own drivers we push Path
+		node.kernel_driver = type(proxy) == "table"
+		kernelLog(Log.INFO, "Filesystem", proxy, "mounted at", path.string())
 		return true
 end
 
 function filesystem.exists(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-		if not driver then
-				return false
+		local node, fspath = getNode(path)
+		if not node then
+			return false
 		end
-		return driver.exists(path)
+		return node.driver.exists(node.kernel_driver and fspath or fspath.string())
 end
 
 function filesystem.isDirectory(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-		if not driver then
+		local node, fspath = getNode(path)
+		if not node then
 				return false
 		end
-		return driver.isDirectory(path)
+		return node.driver.isDirectory(node.kernel_driver and fspath or fspath.string())
 end
 
 
 function filesystem.list(path)
 		checkArg(1, path, "string")
-		local driver, path = getFilesystem(path)
-                if not driver then
+		local node, fspath = getNode(path)
+                if not node then
 			return false
 		end
-        	return driver.list(path)
+		local files = {}
+		if #fspath == 0 then
+			for _, n in pairs(node.nodes) do
+				table.insert(files, n.name)
+			end
+		end
+
+        	local fsfiles = node.driver.list(node.kernel_driver and fspath or fspath.string())
+		if fsfiles then
+			for _, f in pairs(fsfiles) do
+				table.insert(files, f)
+			end
+		end
+		return files
 end
 
 function filesystem.open(path, mode)
@@ -370,25 +824,141 @@ function filesystem.open(path, mode)
 		mode = mode or "r"
 		checkArg(2, mode, "string")
 		assert(({r=true, rb=true, w=true, wb=true, a=true, ab=true})[mode], "bad argument #2 (r[b], w[b] or a[b] expected, got " .. mode .. ")")
-		local driver, path = getFilesystem(path)
-		if not driver then
+		local node, fspath = getNode(path)
+		if not node then
 				return nil, path
 		end
-		if ({r=true,rb=true})[mode] and not driver.exists(path) then
-				return nil, "file not found: " .. path
+		if ({r=true,rb=true})[mode] and not node.driver.exists(node.kernel_driver and fspath or fspath.string()) then
+				return nil, "file not found: " .. fspath.string()
 		end
-		local handle, reason = driver.open(path, mode)
+		local handle, reason = node.driver.open(node.kernel_driver and fspath or fspath.string(), mode)
 		if not handle then
 				return nil, reason
 		end
 		local stream = {
-				driver = driver,
+				kernel_driver = node.kernel_driver,
+				driver = node.driver,
 				handle = handle
 		}
+		-- TODO protect
 		return setmetatable(stream, {__index = filesystemHandle})
 end
 
 libs.filesystem = filesystem
+;
+
+function cb_added(uuid)
+	return {
+		write = function (handle, data)
+			dprint("component.invoke", handle.uuid, "say", data)
+			--component.invoke(handle.uuid, "")
+		end
+		-- TODO read by handling event
+	}
+end
+
+function cb_removed(uuid)
+	
+end
+
+register_driver("chat_box", cb_added, cb_removed)
+;
+
+function createAllocator()
+	local list = {}
+	local allocator = {
+		list = list,
+		index = 1
+	}
+	function allocator:new()
+		local element = {}
+		local index = self.index
+		self.list[index] = element
+		repeat
+			self.index = self.index + 1
+		until not self.list[self.index]
+		element.index = index
+		return element
+	end
+	function allocator:remove(element)
+		panic("ALLOCATOR REMOVE")
+	end
+	return allocator, list
+end
+;
+
+devfs = {
+	label = "devfs",
+	data = {}
+}
+
+local allocator, handles = createAllocator()
+
+local function getNode(path)
+	local node = devfs.data
+	for _, n in pairs(path) do
+		if node.__file then
+			return nil, "file is not directory"
+		end
+		node = node[n]
+		if not node then
+			return nil, "no such file or directory"
+		end
+	end
+	return node
+end
+
+function devfs.open(path)
+	local node, reason = getNode(path)
+	if not node.__file then
+		return nil, "it's a directory"
+	end
+	local handle = allocator:new()
+	handle.node = node
+	if handle.open then
+		handle.open(handle)
+	end
+	return handle.index
+end
+
+function devfs.read(index, ...)
+	return handles[index].node.read(handles[index], ...)
+end
+
+function devfs.exists(path)
+	local node = getNode(path)
+	return not not node
+end
+
+function devfs.list(path)
+	local node, result = getNode(path)
+	if not node then
+		return nil, result
+	end
+	if node.__file then
+		return nil, "file is not directory"
+	end
+	local files = {}
+	for n in pairs(node) do
+		table.insert(files, n)
+	end
+	return files
+end
+
+function devfs.isDirectory(path)
+	local node, result = getNode(path)
+	if not node then
+		return false
+	end
+	return not node.__file
+end
+
+devfs.data.null = {
+	__file = true,
+	write = function() end,
+	read = function() end
+}
+
 ;
 
 local bufferMethods = {}
@@ -654,6 +1224,80 @@ local libbuffer = buffer
 libs.buffer = libbuffer
 ;
 
+libevent = {}
+
+function libevent.on(event, f)
+	local thread = createThread(function ()
+		while true do
+			f(table.unpack(table.pack(waitEvent("signal", event)), 2))
+		end
+	end, "[event listener]", thisThread.process)
+end
+
+-- TODO make event regexp
+function libevent.wait(event, ...)
+	return table.unpack(table.pack(waitEvent("signal", event, ...)), 2)
+end
+
+libs.event = libevent
+;
+
+local user = {}
+local users = {
+	[0] = {
+		id = 0,
+		login = "root",
+		password = "toor",
+		shell = "/bin/sh.lua"
+	},
+	[1000] = {
+		id = 1000,
+		login = "zabqer",
+		password = "tester",
+		shell = "/bin/sh.lua"
+	}
+}
+
+function user.auth(login, password)
+	local id
+	for _, u in pairs(users) do
+		if u.login == login then
+			if u.password == password then
+				return u.id
+			else
+				os.sleep(5)
+			end
+		end
+	end
+	return nil, "login incorrect"
+end
+
+function user.getInfo(id)
+	if not users[id] then
+		return nil, "no such user"
+	end
+	return protectTable({
+		id = users[id].id,
+		login = users[id].login,
+		shell = users[id].shell
+	}, true, false)
+end
+
+function processMethods:setUser(id)
+	if self.process.user ~= "root" then
+		return false, "permissions denied"
+	end
+	if not users[id] then
+		return nil, "no such user"
+        end
+	self.process.user = users[id].login
+	return true
+end
+
+
+libs.user = user
+;
+
 GLOBAL.io = {}
 
 function GLOBAL.io.close(file)
@@ -827,417 +1471,6 @@ function GLOBAL.os.pts()
 	-- TODO
 	return {write=nullFunction, read=nullFunction}
 end
-;
-
-libevent = {}
-
-function libevent.on(event, f)
-	local thread = createThread(function ()
-		while true do
-			f(table.unpack(table.pack(waitEvent("signal", event)), 2))
-		end
-	end, "[event listener]", thisThread.process)
-end
-
--- TODO make event regexp
-function libevent.wait(event, ...)
-	return table.unpack(table.pack(waitEvent("signal", event, ...)), 2)
-end
-
-libs.event = libevent
-;
-
-Log = {
-		DEBUG = 0,
-		INFO = 1,
-		WARNING = 2,
-		ERROR = 3
-}
-
-local levelName = {
-		[0] = "DEBUG",
-		[1] = "INFO",
-		[2] = "WARNING",
-		[3] = "ERROR"
-}
-
-local function extend(level, ...)
-		local str = ""
-		for _, s in pairs({...}) do
-				str = str .. " " .. s
-		end
-		local clock = math.floor(os.clock() * 1000) / 1000
-		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str
-end
-
-kernelLogger = {
-	write = function (_, str)
- 		-- TODO write to file after boot
-		--bootLogger(str)
-	end
-}
-
-function kernelLog(level, ...)
-		local args = table.pack(...)
-		for i = 1, #args do
-				args[i] = tostring(args[i])
-		end
-		if level < 1 then
-			return
-		end
-		kernelLogger:write(extend(level, table.unpack(args)))
-end
-
-local gpu, screen = component.list("gpu")(), component.list("screen")()
-
-local invoke = component.invoke
-
-function bootLogger() end
-
-if gpu and screen then
-		invoke(gpu, "bind", screen)
-		local w, h = invoke(gpu, "getResolution")
-		local y = 0
-		invoke(gpu, "fill", 1, 1, w, h, " ")
-		local function drawLine(str)
-				if y == h then
-						invoke(gpu, "copy", 1, 2, w, h - 1, 0, -1)
-						invoke(gpu, "fill", 1, h, w, 1, " ")
-				else
-						y = y + 1
-				end
-				invoke(gpu, "set", 1, y, str)
-		end
-		function bootLogger(str)
-			str = str:gsub("\t", "  ")
-			if dprint then
-                        	dprint(str)
-			end
-                            local ss = ""
-                            for s in str:gmatch("[^\r\n]+") do
-                                    ss = ss .. s
-                                    while #ss > 0 do
-					if unicode.len(ss) > w then
-						line = unicode.wtrunc(ss, w)
-                                        else
-                                        	line = ss
-                                        end
-                                        drawLine(line)
-                                        ss = unicode.sub(ss, unicode.len(line) + 1)
-                                   end
-                           end
-		end
-end
-;
-
-kernelThread = {
-	name = "kernel",
-	deadline = 0,
-}
-
-thisThread = kernelThread
-
-local nextPID, nextUID = 1, 1
-
-function allocateIds()
-	local pid, uid = nextPID, nextUID
-	nextUID = nextUID + 1
-	repeat
-		nextPID = nextPID + 1
-	until not threads[nextPID]
-	return pid, uid
-end
-
-threads = {}
-processes = {}
-
-function createProcess(f, name, parent, user, paused, ...)
-	local process = {
-		name = name,
-		processes = {},
-		threads = {},
-		parent = parent,
-		user = user,
-		workingDirectory = "/",
-		envvar = parent and setmetatable({}, {__index=parent.envvar}) or {}
-	}
-	if parent then
-		table.insert(parent.processes, process)
-	end
-	local th, reason = createThread(f, name, process, paused, ...)
-	if not th then
-		return nil, reason
-	end
-	process.pid = process.thread.pid
-	process.uid = process.thread.uid
-	processes[process.pid] = process
-	kernelLog(Log.DEBUG, "Created process pid:", process.pid, "name:", process.name)
-	return process
-end
-
-function createThread(f, name, process, paused, ...)
-	local thread = {
-		name = name or "unknown",
-		running = false,
-		paused = paused or false,
-		process = process,
-		deadline = computer.uptime(),
-		eventQueue = {{"args", ...}},
-		awaiting = "args"
-	}
-	thread.coroutine = coroutine.create(function (...)
-		local args = table.pack(...)
-		local result = table.pack(xpcall(function()
-			f(table.unpack(args))
-		end, function(msg)
-			msg = msg or "unknown"
-			kernelLog(Log.INFO, "Error in thread [pid: " .. thread.pid .. "]: " .. msg)
-			kernelLog(Log.INFO, debug.traceback())
-			if thread.process.stderr then
-					thread.process.stderr:write("Error in thread [pid: " .. thread.pid .. "]: " .. msg .. "\n")
-					thread.process.stderr:write(debug.traceback() .. "\n")
-			end
-		end))
-		return table.unpack(result, 2)
-	end)
-	if not process.thread then
-		process.thread = thread
-	else
-		table.insert(process.threads, thread)
-	end
-	thread.pid, thread.uid = allocateIds()
-	threads[thread.pid] = thread
-	kernelLog(Log.DEBUG, "Created thread pid:", thread.pid, "name:", thread.name, "run:", not paused)
-	return thread
-end
-
-function kill(pid)
-	local thread = threads[pid]
- 	kernelLog(Log.DEBUG, "Killed", thread.process.thread == thread and "process" or "thread", "pid:", thread.pid, "name:", thread.name)
-	if thread.process.thread == thread then
-		for _, th in pairs(thread.process.threads) do
-			kill(th.pid)
-		end
-		for _, p in pairs(thread.process.processes) do
-			kill(th.pid)
-		end
-		processes[pid] = nil
-		local index
-		for i, p in pairs(thread.process.parent.processes) do
-			if p.pid == pid then
-				index = i
-			end
-		end
-		table.remove(thread.process.parent.processes, index)
-	else
-		local index
-		for i, th in pairs(thread.process.threads) do
-			if th.pid == pid then
-				index = i
-			end
-		end
-		table.remove(thread.process.threads, index)
-	end
-	if pid < nextPID then
-		nextPID = pid
-	end
-	pushEvent("kill", pid)
-	threads[pid] = nil
-end
-
-function pushEvent(name, ...)
-	for _, thread in pairs(threads) do
-		if thread.awaiting == name then
-			table.insert(thread.eventQueue, table.pack(name, ...))
-		end
-	end
-end
-
-function waitEvent(name, ...)
-	local args
-	while true do
-		::wait::
-		args = table.pack(coroutine.yield(name))
-		for i, arg in ipairs(table.pack(...)) do
-			if arg ~= nil and arg ~= args[i] then
-				goto wait
-			end
-		end
-		return name, table.unpack(args)
-	end
-end
-
-local libthread = {}
-
-processMethods = {}
-local iosMethods = {}
-
-function processMethods:info()
-	local childs = {}
-	for _, th in pairs(self.process.threads) do
-		table.insert(childs, th.pid)
-	end
-	for _, p in pairs(self.process.processes) do
-		table.insert(childs, p.pid)
-	end
-	return protectTable({
-		pid = self.process.pid,
-		name = self.process.name,
-		user = self.process.user,
-		childs = childs,
-		process = true
-	}, true, false)
-end
-
-function processMethods:IO()
-	return setmetatable({}, {
-		__index = function (_, key)
-			if key == "stdout" then
-				return self.process.stdout
-			elseif key == "stdin" then
-				return self.process.stdin
-			elseif key == "stderr" then
-				return self.process.stderr
-			end
-			return nil
-		end,
-		__newindex = function (_, key, value)
-			if type(value) ~= "Stream" then
-				error("Not a stream")
-				return
-			end
-			if key == "stdout" then
-				self.process.stdout = value
-			elseif key == "stdin" then
-				self.process.stdin = value
-			elseif key == "stderr" then
-				self.process.stderr = value
-			end
-		end
-	})
-end
-
-function processMethods:run()
-	kernelLog(Log.DEBUG, "Process run pid:", self.process.pid, "name:", self.process.name)
-	self.process.thread.paused = false
-	for _, th in pairs(self.process.threads) do
-		th.paused = false
-	end
-end
-
-function processMethods:join()
-	waitEvent("kill", self.process.pid)
-end
-
-local threadMethods = {}
-
-function threadMethods:info()
-	return protectTable({
-		pid = self.thread.pid,
-		name = self.thread.name,
-		process = false
-	}, true, false)
-end
-
-function libthread.createProcess(f, name, ...)
-	checkArg(1, f, "string", "function")
-	if type(f) == "string" then
-		name = name or f
-		local reason
-		f, reason = loadfile(f)
-		if not f then
-			return nil, reason
-		end
-	end
-	local process = createProcess(f, name, thisThread.process, thisThread.process.user, true, ...)
-	return protectObject({
-		process = process
-	}, processMethods, "Process")
-end
-
-function libthread.thisProcess()
-	return protectObject({
-		process = thisThread.process
-	}, processMethods, "Process")
-end
-
-function libthread.createThread(f, name, ...)
-	checkArg(1, f, "function")
-	local th = createThread(f, name, thisThread.process, false, ...)
-end
-
-function libthread.byPid(pid)
-	checkArg(1, pid, "number")
-	if processes[pid] then
-		return protectObject({
-			process = processes[pid]
-		}, processMethods, "Process")
-	end
-	if threads[pid] then
-		return protectObject({
-			thread = threads[pid]
-		}, threadMethods, "Thread")
-	end
-	return nil, "no such process"
-end
-
-libs.thread = libthread
-;
-
-local user = {}
-local users = {
-	[0] = {
-		id = 0,
-		login = "root",
-		password = "toor",
-		shell = "/bin/sh.lua"
-	},
-	[1000] = {
-		id = 1000,
-		login = "zabqer",
-		password = "tester",
-		shell = "/bin/sh.lua"
-	}
-}
-
-function user.auth(login, password)
-	local id
-	for _, u in pairs(users) do
-		if u.login == login then
-			if u.password == password then
-				return u.id
-			else
-				os.sleep(5)
-			end
-		end
-	end
-	return nil, "login incorrect"
-end
-
-function user.getInfo(id)
-	if not users[id] then
-		return nil, "no such user"
-	end
-	return protectTable({
-		id = users[id].id,
-		login = users[id].login,
-		shell = users[id].shell
-	}, true, false)
-end
-
-function processMethods:setUser(id)
-	if self.process.user ~= "root" then
-		return false, "permissions denied"
-	end
-	if not users[id] then
-		return nil, "no such user"
-        end
-	self.process.user = users[id].login
-	return true
-end
-
-
-libs.user = user
 ;return (function(...)
 		kernelLog(Log.DEBUG, "[main] Starting kernel")
 		kernelLog(Log.INFO, "HyperKernel / " .. KernelVersion .. " / Zabqer")
@@ -1246,9 +1479,11 @@ libs.user = user
 		if not success then
 			panic(reason)
 		end
+		filesystem.mount("/dev", devfs)
 		kernelLog(Log.DEBUG, "[main] Spawning init thread")
 		local init, reason = createProcess(function ()
 				kernelLog(Log.DEBUG, "[init] Init started")
+				dprint(loadfile("/sbin/init.lua"))
 				local result, reason = pcall(loadfile(Config.initPath or "/sbin/init.lua"))
 				panic("Init dead: " .. (reason or "unknown"))
 		end, "init", _, "root")
@@ -1257,7 +1492,10 @@ libs.user = user
 		end
 		init.workingDirectory = "/"
 		init.stdout = kernelLogger
+		init.stderr = kernelLogger
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
+
+		-- Move to threading???
 
 		local lastYield = computer.uptime()
 		yieldTime = 1--math.max(4.9, math.min(0.1, Config.yieldTime or 3))
@@ -1341,6 +1579,7 @@ libs.user = user
 			end
 			::yieldMachine::
 			local deadline = nextDeadline()
+			-- TODO Call emitEvent or pushEvent
 			local event = table.pack(computer.pullSignal(math.max(0, computer.uptime() - deadline)))
 			lastYield = computer.uptime()
 			if #event > 0 then
@@ -1352,6 +1591,15 @@ libs.user = user
 					if event[2] then
 						table.insert(thread.eventQueue, table.pack("signal", table.unpack(event)))
 					end
+				end
+				for _, ehandler in pairs(eventHandlers) do
+					for i, v in ipairs(ehandler.data) do
+						if i ~= 1 and v ~= nil and v ~= event[i - 1] then
+							goto continue
+						end
+					end
+					ehandler.callback(table.unpack(event))
+					::continue::
 				end
 			end
 

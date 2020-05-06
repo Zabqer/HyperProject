@@ -29,7 +29,7 @@ end
 kernelLogger = {
 	write = function (_, str)
  		-- TODO write to file after boot
-		--bootLogger(str)
+		bootLogger(str)
 	end
 }
 
@@ -39,7 +39,7 @@ function kernelLog(level, ...)
 				args[i] = tostring(args[i])
 		end
 		if level < 1 then
-			return
+--			return
 		end
 		kernelLogger:write(extend(level, table.unpack(args)))
 end
@@ -68,6 +68,9 @@ if gpu and screen then
 			str = str:gsub("\t", "  ")
 			if dprint then
                         	dprint(str)
+			end
+			if true then
+				return
 			end
                             local ss = ""
                             for s in str:gmatch("[^\r\n]+") do

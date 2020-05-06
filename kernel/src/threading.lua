@@ -141,6 +141,16 @@ function waitEvent(name, ...)
 	end
 end
 
+local eventHandlers = {}
+
+function addKenrelEventHandler(data, callback)
+	kernelLog(Log.DEBUG, "Registered kernel event handler for", table.unpack(data))
+	table.insert(eventHandlers, {
+		data = data,
+		callback = callback
+	})
+end
+
 local libthread = {}
 
 processMethods = {}

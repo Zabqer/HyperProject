@@ -15,6 +15,9 @@ local sourcesDirectory = "./src/"
 local kernelPath = "kernel.lua"
 
 local sources = {
+		"src/allocator.lua",
+		"src/driver_chatbox.lua",
+		"src/component.lua",
 		"src/log.lua",
 		"src/config.lua",
 		"src/io.lua",
@@ -22,6 +25,7 @@ local sources = {
 		"src/event.lua",
 		"src/user.lua",
 		"src/filesystem.lua",
+		"src/dev_filesystem.lua",
 		"src/threading.lua",
 		--"src/userspace.lua",
 		"src/buffer.lua",
@@ -92,10 +96,11 @@ local function handleModule(module)
 		if not handled[module] then
 				handled[module] = true
 				if module.dependicles then
-						for _, dep in pairs(module.dependicles) do
+						for _, dep in ipairs(module.dependicles) do
 								handleModule(modules[dep])
 						end
 				end
+				verbose(">>> " .. module.name)
 				table.insert(code, module.code)
 		end
 end

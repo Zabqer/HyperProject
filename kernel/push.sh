@@ -1,2 +1,2 @@
-lua build-kernel.lua
-mv kernel.lua ~/AurumEmulator/filesystem_address/init.lua
+lua build-kernel.lua filesystem_address
+mv kernel.lua ../root/init.lua

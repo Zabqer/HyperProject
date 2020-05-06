@@ -62,6 +62,8 @@ function eventHandler(_, address, type)
 	end
 end
 
+dprint(computer.pushSignal("component_added", "chat_box", "CBUUID"))
+
 event.on("component_added", eventHandler)
 for address, ctype in component.list() do
     eventHandler(_, address, ctype)

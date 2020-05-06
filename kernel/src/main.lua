@@ -31,9 +31,11 @@ function main(...)
 		if not success then
 			panic(reason)
 		end
+		filesystem.mount("/dev", devfs)
 		kernelLog(Log.DEBUG, "[main] Spawning init thread")
 		local init, reason = createProcess(function ()
 				kernelLog(Log.DEBUG, "[init] Init started")
+				dprint(loadfile("/sbin/init.lua"))
 				local result, reason = pcall(loadfile(Config.initPath or "/sbin/init.lua"))
 				panic("Init dead: " .. (reason or "unknown"))
 		end, "init", _, "root")
@@ -42,7 +44,10 @@ function main(...)
 		end
 		init.workingDirectory = "/"
 		init.stdout = kernelLogger
+		init.stderr = kernelLogger
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
+
+		-- Move to threading???
 
 		local lastYield = computer.uptime()
 		yieldTime = 1--math.max(4.9, math.min(0.1, Config.yieldTime or 3))
@@ -126,6 +131,7 @@ function main(...)
 			end
 			::yieldMachine::
 			local deadline = nextDeadline()
+			-- TODO Call emitEvent or pushEvent
 			local event = table.pack(computer.pullSignal(math.max(0, computer.uptime() - deadline)))
 			lastYield = computer.uptime()
 			if #event > 0 then
@@ -137,6 +143,15 @@ function main(...)
 					if event[2] then
 						table.insert(thread.eventQueue, table.pack("signal", table.unpack(event)))
 					end
+				end
+				for _, ehandler in pairs(eventHandlers) do
+					for i, v in ipairs(ehandler.data) do
+						if i ~= 1 and v ~= nil and v ~= event[i - 1] then
+							goto continue
+						end
+					end
+					ehandler.callback(table.unpack(event))
+					::continue::
 				end
 			end
 

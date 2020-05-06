@@ -75,6 +75,7 @@ function copyRoot()
 	}
 	local sbin = {
 		"getty",
+		"readkey",
 		"init",
 		"login"
 	}

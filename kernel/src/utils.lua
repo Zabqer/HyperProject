@@ -22,6 +22,9 @@ function protectObject(object, methods, name)
 				end,
 				__len = methods.len and function ()
 						return methods.len(object)
+				end,
+				__pairs = methods.pairs and function ()
+					return methods.pairs(object)
 				end
 		})
 end
