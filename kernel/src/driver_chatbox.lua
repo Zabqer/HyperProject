@@ -1,20 +1,27 @@
 --[[
 		Name: driver_chatbox;
-		Depends: [component, filesystem];
+		Depends: [component, filesystem, threading];
 		Description: Provides driver for chat_box componen;
 ]]--
 
-function cb_added(uuid)
+-- addKenrelEventHandler({"signal", "chat_message"}, function()
+--
+-- end)
+
+function cb_added()
 	return {
 		write = function (handle, data)
-			dprint("component.invoke", handle.uuid, "say", data)
-			--component.invoke(handle.uuid, "")
+			component.invoke(handle.node.uuid, "say", data)
+		end,
+		read = function (handle)
+			local event = waitEvent("signal", "chat_message", handle.node.uuid)
+			return event[4]
 		end
 		-- TODO read by handling event
 	}
 end
 
-function cb_removed(uuid)
+function cb_removed()
 	
 end
 

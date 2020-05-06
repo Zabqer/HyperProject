@@ -5,6 +5,8 @@ local thread = require("thread")
 os.setenv("PWD", "/")
 os.setenv("PS", sh.expand("\x1b[91m$USER\x1b[39m@\x1b[92m$HOSTNAME\x1b[39m $PWD $ "))
 
+sh.execute("write /dev/chat-box/0 SUKA")
+
 while true do
     io.write(sh.expand("$PS"))
     local cmd = term.read()

@@ -104,13 +104,13 @@ local function getNode(path)
 	end
 end
 
-local function printNodes(node, i)
-	i = i or 0
-	dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
-	for _, n in pairs(node.nodes) do
-		printNodes(n, i + 1)
-	end
-end
+-- local function printNodes(node, i)
+-- 	i = i or 0
+-- 	dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
+-- 	for _, n in pairs(node.nodes) do
+-- 		printNodes(n, i + 1)
+-- 	end
+-- end
 
 local function createNode(node, path)
 	for _, f in pairs(path) do
@@ -121,45 +121,16 @@ local function createNode(node, path)
 	return node
 end
 
--- local function getFilesystem(path)
--- 		local fspath = Path("")
--- 		path = Path(path)
--- 		dprint(path.absolute())
--- 		local node = nodes
--- 		function findNode(nodes, name)
--- 			for _, node in pairs(nodes) do
--- 				if node.name == name then
--- 					return node
--- 				end
--- 			end
--- 			return nil
--- 		end
--- 		local node = rootNode
--- 		while true do
--- 			local name = path:remove(1)
--- 			fspath:append(name)
--- 			local nnode = findNode(node.nodes, name)
--- 			if not nnode then
--- 				return node.driver, fspath.absolute()
--- 			end
--- 			node = nnode
--- 		end
--- 		-- while true do
--- 		-- 		if mounts[path.absolute()] then
--- 		-- 				return mounts[path.absolute()].driver, fspath.absolute()
--- 		-- 		end
--- 		-- 		if #path == 0 then
--- 		-- 				return nil, "no mounted filesystems"
--- 		-- 		end
--- 		-- 		fspath:append(path:remove(), 0)
--- 		-- end
--- end
-
 local filesystemHandle = {}
 
 function filesystemHandle:read(count)
 		checkArg(2, count, "number")
 		return self.driver.read(self.handle, count)
+end
+
+function filesystemHandle:write(data)
+	checkArg(2, data, "string")
+	return self.driver.write(self.handle, data)
 end
 
 function filesystemHandle:close()

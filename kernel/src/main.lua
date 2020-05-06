@@ -35,7 +35,6 @@ function main(...)
 		kernelLog(Log.DEBUG, "[main] Spawning init thread")
 		local init, reason = createProcess(function ()
 				kernelLog(Log.DEBUG, "[init] Init started")
-				dprint(loadfile("/sbin/init.lua"))
 				local result, reason = pcall(loadfile(Config.initPath or "/sbin/init.lua"))
 				panic("Init dead: " .. (reason or "unknown"))
 		end, "init", _, "root")
@@ -150,7 +149,7 @@ function main(...)
 							goto continue
 						end
 					end
-					ehandler.callback(table.unpack(event))
+					ehandler.callback(table.unpack(event, 2))
 					::continue::
 				end
 			end

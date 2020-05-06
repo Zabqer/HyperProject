@@ -27,6 +27,9 @@ end
 
 function devfs.open(path)
 	local node, reason = getNode(path)
+	if not node then
+		return nil, reason
+	end
 	if not node.__file then
 		return nil, "it's a directory"
 	end
@@ -39,7 +42,24 @@ function devfs.open(path)
 end
 
 function devfs.read(index, ...)
+	if not handles[index].node.read then
+		return nil, "operation not permitted"
+	end
 	return handles[index].node.read(handles[index], ...)
+end
+
+function devfs.write(index, ...)
+	if not handles[index].node.write then
+		return false, "operation not permitted"
+	end
+	return handles[index].node.write(handles[index], ...)
+end
+
+function devfs.close(index)
+	if not handles[index].node.close then
+		return
+	end
+	handles[index].node.close(handles[index])
 end
 
 function devfs.exists(path)
@@ -76,3 +96,14 @@ devfs.data.null = {
 	read = function() end
 }
 
+-- function devfs.printNodes(node, i, name)
+-- 	node = node or devfs.data
+-- 	i = i or 0
+-- 	name = name or "/"
+-- 	dprint(string.rep(" ", i) .. ">" .. name .. " " .. (node.__file and "FILE" or "DIR"))
+-- 	if not node.__file then
+-- 		for m, n in pairs(node) do
+-- 			devfs.printNodes(n, i + 1, m)
+-- 		end
+-- 	end
+-- end
