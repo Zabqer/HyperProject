@@ -27,8 +27,9 @@ local function extend(level, ...)
 end
 
 kernelLogger = {
-	write = function (_, str)
- 		-- TODO write to file after boot
+	buffer = "",
+	write = function (self, str)
+		self.buffer = self.buffer .. str
 		bootLogger(str)
 	end
 }

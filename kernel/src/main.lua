@@ -46,6 +46,11 @@ function main(...)
 		init.stderr = kernelLogger
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
 
+		local logf = filesystem.open("/kernel.log", "w")
+
+		logf:write(kernelLogger.buffer)
+		kernelLogger = logf
+
 		-- Move to threading???
 
 		local lastYield = computer.uptime()
