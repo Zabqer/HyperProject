@@ -8,7 +8,7 @@ local drivers = {}
 
 -- TODO by uuid
 
-addKenrelEventHandler({"signal", "component_added"}, function (t, uuid)
+addKenrelEventHandler({"signal", "component_added"}, function (uuid, t)
 	kernelLog(Log.DEBUG, "Component added", t, uuid)
 	t = t:gsub("_", "-")
 	if drivers[t] then
