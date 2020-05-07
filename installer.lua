@@ -61,6 +61,10 @@ end
 function copyRoot()
 	print("Copying root")
 	local bin = {
+		"cat",
+		"reboot",
+		"write",
+		"watch",
 		"ps",
 		"whoami",
 		"echo",
