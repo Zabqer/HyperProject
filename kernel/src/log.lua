@@ -23,7 +23,7 @@ local function extend(level, ...)
 				str = str .. " " .. s
 		end
 		local clock = math.floor(os.clock() * 1000) / 1000
-		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str
+		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str .. "\n"
 end
 
 kernelLogger = {
