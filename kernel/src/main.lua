@@ -49,7 +49,11 @@ function main(...)
 		local logf = filesystem.open("/kernel.log", "w")
 
 		logf:write(kernelLogger.buffer)
-		kernelLogger = logf
+		kernelLogger = {
+			write = function (_, data)
+				logf:write(data .. "\n")
+			end
+		}
 
 		-- Move to threading???
 

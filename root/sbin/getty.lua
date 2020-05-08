@@ -5,11 +5,12 @@ local thread = require("thread")
 
 local gpu, screen = ...
 
+-- Maybe move to component.proxy?
+
 cx = 1
 cy = 1
 
-w = 80
-h = 25
+local w, h = component.invoke(gpu, "maxResolution")
 
 deffg = 0xFFFFFF
 defbg = 0x000000
@@ -19,11 +20,14 @@ bg = defbg
 
 component.invoke(gpu, "bind", screen)
 
+component.invoke(gpu, "setResolution", w, h)
+
 component.invoke(gpu, "setForeground", fg)
 component.invoke(gpu, "setBackground", bg)
 
 component.invoke(gpu, "fill", 1, 1, w, h, " ")
 
+blinking = true
 blinked = true
 
 function unblink()
@@ -33,13 +37,15 @@ function unblink()
 end
 
 function blink()
-	blinked = not blinked
-	local c, f, b = component.invoke(gpu, "get", cx, cy)
-        local oribg, obpal = component.invoke(gpu, "setBackground", f)
-        local orifg, ofpal = component.invoke(gpu, "setForeground", b)
-        component.invoke(gpu, "set", cx, cy, c)
-        component.invoke(gpu, "setBackground", oribg)
-        component.invoke(gpu, "setForeground", orifg)
+	if blinking then
+		blinked = not blinked
+		local c, f, b = component.invoke(gpu, "get", cx, cy)
+		local oribg, obpal = component.invoke(gpu, "setBackground", f)
+		local orifg, ofpal = component.invoke(gpu, "setForeground", b)
+		component.invoke(gpu, "set", cx, cy, c)
+		component.invoke(gpu, "setBackground", oribg)
+		component.invoke(gpu, "setForeground", orifg)
+	end
 end
 
 function scroll()
@@ -73,6 +79,15 @@ controls = {
 			setFgColor(deffg)
 		elseif codes >= 90 and codes <= 97 then
 			setFgColor(colors[codes - 89])
+		end
+	end,
+	[{"%?25", "[hl]"}] = function (_, t)
+		if t == "h" then
+			blinking = true
+			blink()
+		else
+			unblink()
+			blinking = false
 		end
 	end,
 	-- ["[91m"] = function()
@@ -170,7 +185,9 @@ end
 
 blinker = thread.createThread(function()
 	while true do
-		blink()
+		if blink then
+			blink()
+		end
 		os.sleep(1)
 	end
 end, "blink timer")

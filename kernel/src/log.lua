@@ -23,7 +23,7 @@ local function extend(level, ...)
 				str = str .. " " .. s
 		end
 		local clock = math.floor(os.clock() * 1000) / 1000
-		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str .. "\n"
+		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str
 end
 
 kernelLogger = {
@@ -42,7 +42,11 @@ function kernelLog(level, ...)
 		if level < 1 then
 --			return
 		end
-		kernelLogger:write(extend(level, table.unpack(args)))
+		local data = extend(level, table.unpack(args))
+		if dprint then
+			dprint(data)
+		end
+		kernelLogger:write(data)
 end
 
 local gpu, screen = component.list("gpu")(), component.list("screen")()
@@ -67,9 +71,6 @@ if gpu and screen then
 		end
 		function bootLogger(str)
 			str = str:gsub("\t", "  ")
-			if dprint then
-                        	dprint(str)
-			end
 			if true then
 				return
 			end

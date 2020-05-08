@@ -130,8 +130,12 @@ function sh.execute(line)
 	if not th then
 		return nil, reason
 	end
+	-- COPY IOS 
 	local ios = th:IO()
-	ios.stdin = io.stdin
+	ios.stdin = io.finder(io.stdin, "\x1bC", function () -- interrupt
+		dprint("SIGINT!!")
+		th:kill()
+	end)
 	ios.stdout = io.stdout
 	ios.stderr = io.stderr
 	-- th:onKill(function (pid)

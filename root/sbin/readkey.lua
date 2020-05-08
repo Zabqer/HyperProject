@@ -142,6 +142,8 @@ while true do
 	if pressedCodes[keys.lcontrol] then
 		if code == keys.c then
 			output:write("\x1bC")
+		elseif code == keys.d then
+			output:write("\x1bD")
 		end
 	elseif char ~= 0 and char ~= 127 then 
         	output:write(unicode.char(char))

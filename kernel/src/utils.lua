@@ -38,8 +38,10 @@ function protectTable(table, read, write)
 end
 
 function GLOBAL.yield()
+	if thisThread ~= kernelThread then
 		thisThread.deadline = computer.uptime()
 		coroutine.yield()
+	end
 end
 
 GLOBAL.os = setmetatable({}, {__index = os})

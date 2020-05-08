@@ -124,8 +124,8 @@ end
 local filesystemHandle = {}
 
 function filesystemHandle:read(count)
-		checkArg(2, count, "number")
-		return self.driver.read(self.handle, count)
+	checkArg(2, count, "number")
+	return self.driver.read(self.handle, count)
 end
 
 function filesystemHandle:write(data)

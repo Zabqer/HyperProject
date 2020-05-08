@@ -160,6 +160,32 @@ function GLOBAL.io.rewriter(f, stream)
 	return stream
 end
 
+local finderMethods = {}
+
+function finderMethods:read(count)
+	dprint("REEEEAD", count)
+	local result, reason = self.stream:read(count)
+	dprint("DATA READED", result, reason)
+	if result then
+		local s = result:find(self.data)
+		if s then
+			self.handler()
+		end
+	end
+	return result, reason
+end
+
+function GLOBAL.io.finder(stream, data, f)
+	stream = buffer(protectObject({
+		stream = stream,
+		handler = f,
+		data = data
+	}, finderMethods, type(stream)), "r")
+	stream:setvbuf("no")
+	return stream
+end
+	
+
 
 setmetatable(io, {__index = function (_, key)
 		if key == "stdin" then

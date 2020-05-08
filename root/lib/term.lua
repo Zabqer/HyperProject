@@ -1,11 +1,13 @@
 local term = {}
 
 function term.read(_, hint)
+	term.blinkOn()
 	local str = ""
 	while true do
 		local char = io.read(1)
 		if char == "\n" then
 			io.write(char)
+			term.blinkOff()
 			return str
 		elseif char == "\b" then
 			if unicode.len(str) > 0 then
@@ -20,27 +22,35 @@ function term.read(_, hint)
 end
 
 function term.clear()
-	io.write("\x1b[2J")
+	writeControl("[2J")
 end
 
 function writeControl(code)
-	io.write("\x1b[" .. code)
+	io.write("\x1b" .. code)
 end
 
 function term.defaultFg()
-	writeControl("39m")
+	writeControl("[39m")
 end
 
 function term.lightredFg()
-	writeControl("91m")
+	writeControl("[91m")
 end
 
 function term.lightcyanFg()
-	writeControl("96m")
+	writeControl("[96m")
 end
 
 function term.lightgreenFg()
-	writeControl("92m")
+	writeControl("[92m")
+end
+
+function term.blinkOn()
+	writeControl("?25h")
+end
+
+function term.blinkOff()
+	writeControl("?25l")
 end
 
 return term
