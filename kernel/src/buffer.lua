@@ -113,6 +113,18 @@ function readAll(self)
 		return result
 end
 
+function readBuffer(self)
+	if #self.bufferRead == 0 then
+		local result, reason = readChunk(self)
+		if not result and reason then
+			return nil, reason
+		end
+	end
+	local data = self.bufferRead
+	self.bufferRead = ""
+	return data
+end
+
 function bufferMethods:read(...)
 		if not self.r then
 				return nil, "read mode was not enabled for this stream"
@@ -120,7 +132,7 @@ function bufferMethods:read(...)
 		if self.w or self.a then
 				bufferMethods.flush(self)
 		end
-	yield()
+--	yield()
 		local function read(i, arg)
 				checkArg(i, arg, "number", "string")
 				if type(arg) == "number" then
@@ -135,6 +147,8 @@ function bufferMethods:read(...)
 								return readLine(self, false)
 						elseif rt == "a" then
 								return readAll(self)
+						elseif rt == "b" then
+							return readBuffer(self)
 						else
 								error("bad argument #" .. i .. " (n, l, L or a expected, got " .. arg .. ")")
 						end
@@ -164,7 +178,7 @@ function bufferMethods:write(...)
 		if not self.w and not self.a then
 				return nil, "write mode was not enabled for this stream"
 		end
-	yield()
+--	yield()
 		local args = table.pack(...)
 		for i = 1, #args do
 				if type(args[i]) == "number" then

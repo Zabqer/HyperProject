@@ -27,28 +27,35 @@ component.invoke(gpu, "setBackground", bg)
 
 component.invoke(gpu, "fill", 1, 1, w, h, " ")
 
-blinking = true
-blinked = true
+blinking = false
+blinked = false
 
-function unblink()
-	if blinked then
-		blink()
+function swapCursor()
+	local c, f, b = component.invoke(gpu, "get", cx, cy)
+	local oribg, obpal = component.invoke(gpu, "setBackground", f)
+	local orifg, ofpal = component.invoke(gpu, "setForeground", b)
+	component.invoke(gpu, "set", cx, cy, c)
+	component.invoke(gpu, "setBackground", oribg)
+	component.invoke(gpu, "setForeground", orifg)
+end
+
+function drawCursor()
+	if not blinked then
+		swapCursor()
+		blinked = true
 	end
 end
 
-function blink()
-	if blinking then
-		blinked = not blinked
-		local c, f, b = component.invoke(gpu, "get", cx, cy)
-		local oribg, obpal = component.invoke(gpu, "setBackground", f)
-		local orifg, ofpal = component.invoke(gpu, "setForeground", b)
-		component.invoke(gpu, "set", cx, cy, c)
-		component.invoke(gpu, "setBackground", oribg)
-		component.invoke(gpu, "setForeground", orifg)
+function unDrawCursor()
+	if blinked then
+		swapCursor()
+		blinked = false
 	end
 end
 
 function scroll()
+	cx = 1
+	cy = cy + 1
 	if cy > h then
 		cy = h
 		component.invoke(gpu, "copy", 1, 2, w, h, 0, -1)
@@ -84,9 +91,7 @@ controls = {
 	[{"%?25", "[hl]"}] = function (_, t)
 		if t == "h" then
 			blinking = true
-			blink()
 		else
-			unblink()
 			blinking = false
 		end
 	end,
@@ -132,29 +137,39 @@ function getControlAction(text)
 	return false
 end
 
+local pBuffer = ""
+
+function printBuffer()
+	if #pBuffer == 0 then return end
+	while unicode.len(pBuffer) + cx > w do
+		local l = unicode.wtrunc(pBuffer, w - cx)
+		dprint(l)
+		component.invoke(gpu, "set", cx, cy, l)
+		pBuffer = unicode.sub(pBuffer, w - cx)
+		scroll()
+	end
+	if #pBuffer > 0 then
+		component.invoke(gpu, "set", cx, cy, pBuffer)
+		cx = cx + unicode.len(pBuffer)
+		pBuffer = ""
+	end
+end
+
 local function handle(c)
 	if c == "\n" then
-		unblink()
-		component.invoke(gpu, "set", cx, cy, " ")
-		cx = 1
-		cy = cy + 1
+		printBuffer()
 		scroll()
 		checkCord()
 	elseif c == "\t" then
-		component.invoke(gpu, "set", cx, cy, " ")
+		printBuffer()
 		cx = cx + 4
 		checkCord()
 	elseif c == "\b" then
-		unblink()
-		-- Stupid hack. Fix that
-		if cx <= w then
-			component.invoke(gpu, "set", cx, cy, " ")
-		end
 		cx = cx - 1
 		component.invoke(gpu, "set", cx, cy, " ")
-		blink()
 		checkCord()
 	elseif c == "\x1b" then
+		printBuffer()
 		isControl = not isControl
 		controlBuffer = ""
 	elseif isControl then
@@ -162,31 +177,20 @@ local function handle(c)
 		if f then
 			isControl = false
 			controlBuffer = ""
+			printBuffer()
 		else
 			controlBuffer = controlBuffer .. c
 		end
-		-- if controls[controlBuffer .. c] then
-		-- 	controls[controlBuffer .. c]()
-		-- 	isControl = false
-		-- 	controlBuffer = ""
-		-- else
-		-- 	controlBuffer = controlBuffer .. c
-		-- end
 	else
-		if cx + 1 > w then
-			cx = 1
-			cy = cy + 1
-		end
-		component.invoke(gpu, "set", cx, cy, c)
-		cx = cx + 1
-		checkCord()
+		pBuffer = pBuffer .. c
 	end
 end
 
 blinker = thread.createThread(function()
 	while true do
-		if blink then
-			blink()
+		if blinking then
+			swapCursor()
+			blinked = not blinked
 		end
 		os.sleep(1)
 	end
@@ -194,7 +198,12 @@ end, "blink timer")
 
 
 while true do
-	local c = input:read(1)
-	handle(c)
+	local data = input:read("*b")
+	unDrawCursor()
+	for c in data:gmatch(".") do
+		handle(c)
+	end
+	printBuffer()
+	drawCursor()
 end
 
