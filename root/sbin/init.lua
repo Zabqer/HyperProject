@@ -14,34 +14,54 @@ os.setenv("PATH", "/bin/?.lua")
 local i = 0
 
 function createTty(gpu, screen)
+	local master, slave = os.pty()
+
+	local keyboard = component.invoke(screen, "getKeyboards")[1]
+	local rk = assert(thread.createProcess("/sbin/readkey.lua", _, keyboard))
+	local io = rk.IO()
+	io.stdout = master
+
+	local gt = assert(thread.createProcess("/sbin/getty.lua", _, gpu, screen))
+	local io = gt.IO()
+	io.stdin = master
+	
+	-- slave.index()
+	local l = assert(thread.createProcess("/sbin/login.lua", _, 0))
+
+	rk:run()
+	gt:run()
+	l:run()
+
+	l:join()
+
 	--pi, po = io.pts()
-	local o1, i1 = io.pipe()
-	local o2, i2 = io.pipe()
-	keyboard = component.invoke(screen, "getKeyboards")[1]
-	-- TODO maybe combine readkey and getty?
-	readkey, reason = thread.createProcess("/sbin/readkey.lua", _, keyboard)
-	if not readkey then
-		error(reason)
-	end
-	local io = readkey.IO()
-	io.stdout = o2
-	readkey:run()
-	getty, reason = thread.createProcess("/sbin/getty.lua", _, gpu, screen)
-	if not getty then
-		error(reason)
-	end
-	io = getty.IO()
-	io.stdin = i1
-	getty:run()
-	login, reason = thread.createProcess("/sbin/login.lua", _, i)
-	i = i + 1
-	if not sh then
-	--	error(reason)
-	end
-	io = login.IO()
-	io.stdin = i2
-	io.stdout = o1
-	login:run()
+	-- local o1, i1 = io.pipe()
+	-- local o2, i2 = io.pipe()
+	-- keyboard = component.invoke(screen, "getKeyboards")[1]
+	-- -- TODO maybe combine readkey and getty?
+	-- readkey, reason = thread.createProcess("/sbin/readkey.lua", _, keyboard)
+	-- if not readkey then
+	-- 	error(reason)
+	-- end
+	-- local io = readkey.IO()
+	-- io.stdout = o2
+	-- readkey:run()
+	-- getty, reason = thread.createProcess("/sbin/getty.lua", _, gpu, screen)
+	-- if not getty then
+	-- 	error(reason)
+	-- end
+	-- io = getty.IO()
+	-- io.stdin = i1
+	-- getty:run()
+	-- login, reason = thread.createProcess("/sbin/login.lua", _, i)
+	-- i = i + 1
+	-- if not sh then
+	-- --	error(reason)
+	-- end
+	-- io = login.IO()
+	-- io.stdin = i2
+	-- io.stdout = o1
+	-- login:run()
 end
 --TODO handle component remove
 function eventHandler(_, address, type)

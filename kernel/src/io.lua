@@ -55,7 +55,7 @@ function pipeOutputMethods:read(count)
 				self.buffer = self.buffer:sub(count + 1)
 				return data
 		end
-		local _, _, t = waitEvent("pipe_changed", self)
+		local _, t = waitEvent("pipe_changed", self)
 		if t == "output_closed" then
 				return nil
 		elseif t == "append" then
@@ -74,14 +74,19 @@ function pipeOutputMethods:close()
 		return true
 end
 
-function GLOBAL.io.pipe()
+function createPipe()
 		local pipe = {
 				buffer = "",
 				closed = false
 		}
-		local wb = buffer(protectObject(pipe, pipeInputMethods, "PipeInput"), "w")
+		return protectObject(pipe, pipeInputMethods, "PipeInput"), protectObject(pipe, pipeOutputMethods, "PipeOutput")
+end
+
+function GLOBAL.io.pipe()
+		local i, o = createPipe()
+		local wb = buffer(i, "w")
 		wb:setvbuf("no")
-		return wb, buffer(protectObject(pipe, pipeOutputMethods, "PipeOutput"), "r")
+		return wb, buffer(o, "r")
 end
 
 function GLOBAL.io.input(file)
@@ -197,9 +202,3 @@ setmetatable(io, {__index = function (_, key)
 		end
 end})
 
-ptss = {}
-
-function GLOBAL.os.pts()
-	-- TODO
-	return {write=nullFunction, read=nullFunction}
-end

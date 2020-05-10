@@ -1,11 +1,23 @@
 local term = {}
+local thread = require("thread")
 
-function term.read(_, hint)
+function term.read(options)
+	if options.interactive == nil then options.interactive = true end
+	if not options.interactive then
+		return io.read("*l")
+	end
+	local input = options.input or io.input()
 	term.blinkOn()
 	local str = ""
 	while true do
-		local char = io.read(1)
-		if char == "\n" then
+		local char = input:read(1)
+		if not char then
+			dprint("CLOSED")
+			return nil
+		elseif #str == 0 and char == "\x04" then
+			dprint("EOT CHAR")
+			return nil
+		elseif char == "\n" then
 			io.write(char)
 			term.blinkOff()
 			return str

@@ -16,7 +16,18 @@ end
 
 -- TODO make event regexp
 function libevent.wait(event, ...)
-	return table.unpack(table.pack(waitEvent("signal", event, ...)), 2)
+	local events = {}
+	for event in string.gmatch(event, "[^|]+") do
+		table.insert(events, event)
+	end
+	while true do
+		local event = table.pack(waitEvent("signal", nil, ...))
+		for _, ev in ipairs(events) do
+			if ev == event[1] then
+				return table.unpack(event)
+			end
+		end
+	end
 end
 
 libs.event = libevent

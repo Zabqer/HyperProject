@@ -130,17 +130,7 @@ function pushEvent(name, ...)
 end
 
 function waitEvent(name, ...)
-	local args
-	while true do
-		::wait::
-		args = table.pack(coroutine.yield(name))
-		for i, arg in ipairs(table.pack(...)) do
-			if arg ~= nil and arg ~= args[i] then
-				goto wait
-			end
-		end
-		return name, table.unpack(args)
-	end
+	return coroutine.yield(name, ...)
 end
 
 local eventHandlers = {}
@@ -215,6 +205,19 @@ function processMethods:join()
 	waitEvent("kill", self.process.pid)
 end
 
+function processMethods:signal(sig)
+	local allowed = {"kill"}
+	for _, a in ipairs(allowed) do
+		if a == sig then
+			if a == "kill" then
+				kill(self.process.pid)
+			end
+			return true
+		end
+	end
+	return false, "unknown signal"
+end
+
 local threadMethods = {}
 
 function threadMethods:info()
@@ -239,6 +242,10 @@ function libthread.createProcess(f, name, ...)
 	return protectObject({
 		process = process
 	}, processMethods, "Process")
+end
+
+function os.getpid()
+	return thisThread.pid
 end
 
 function libthread.thisProcess()

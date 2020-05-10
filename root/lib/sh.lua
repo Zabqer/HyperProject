@@ -143,8 +143,7 @@ function sh.execute(line)
 	-- 	io.error():write("Killed " .. pid)
 	-- end)
 	th:run()
-	th:join()
-	return true
+	return th
 end
 
 return sh

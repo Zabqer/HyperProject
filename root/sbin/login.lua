@@ -33,7 +33,7 @@ while true do
 	os.setenv("USER", u.login)
 
 	-- get user shell
-	shell = thread.createProcess(u.shell)
+	local shell = assert(thread.createProcess(u.shell))
 	shio = shell:IO()
 	shio.stdout = io.stdout
 	shio.stdin = io.stdin

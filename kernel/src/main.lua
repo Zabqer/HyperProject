@@ -82,10 +82,23 @@ function main(...)
 			end
 		end
 
+		function checkAwaiting(thread, event)
+			if thread.awaiting == event[1] then
+				if thread.awaitingArgs ~= nil then
+					for i, arg in ipairs(thread.awaitingArgs) do
+						if arg ~= nil and arg ~= event[i + 1] then
+							return false
+						end
+					end
+				end
+				return true
+			end
+		end
+
 		function tryResume(thread)
 			if not thread.paused then
  				for n, event in pairs(thread.eventQueue) do
-					if event[1] == thread.awaiting then	
+					if checkAwaiting(thread, event) then
 						table.remove(thread.eventQueue, n)
 						resumeThread(thread, event)
 						return

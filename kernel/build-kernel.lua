@@ -21,6 +21,7 @@ local sources = {
 		"src/log.lua",
 		"src/config.lua",
 		"src/io.lua",
+		"src/pty.lua",
 		"src/utils.lua",
 		"src/event.lua",
 		"src/user.lua",
@@ -95,6 +96,7 @@ local handled = {}
 local function handleModule(module)
 		if not handled[module] then
 				handled[module] = true
+				verbose(">> " .. module.name)
 				if module.dependicles then
 						for _, dep in ipairs(module.dependicles) do
 								handleModule(modules[dep])

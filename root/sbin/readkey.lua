@@ -136,22 +136,26 @@ keys = {
 }
 
 while true do
-	local _, _, char, code, user = event.wait("key_down", address)
-	pressedCodes[code] = true
-	if char == 13 then char = 10 end
-	if pressedCodes[keys.lcontrol] then
-		if code == keys.c then
-			output:write("\x1bC")
-		elseif code == keys.d then
-			output:write("\x1bD")
+	local t, _, char, code, user = event.wait("key_down|key_up", address)
+	if t == "key_down" then
+		pressedCodes[code] = true
+		if char == 13 then char = 10 end
+		if pressedCodes[keys.lcontrol] then
+			if code == keys.c then
+				output:write("\x03")
+			elseif code == keys.d then
+				output:write("\x04")
+			end
+		elseif char ~= 0 and char ~= 127 then 
+			output:write(unicode.char(char))
+		else
+			if code == 200 then output:write("\x1b[A")
+			elseif code == 208 then ouput:write("\x1b[B")
+			elseif code == 205 then output:write("\x1b[C")
+			elseif code == 203 then output:write("\x1b[D")
+			end
 		end
-	elseif char ~= 0 and char ~= 127 then 
-        	output:write(unicode.char(char))
 	else
-	        if code == 200 then output:write("\x1b[A")
-	        elseif code == 208 then ouput:write("\x1b[B")
-	        elseif code == 205 then output:write("\x1b[C")
-	        elseif code == 203 then output:write("\x1b[D")
-		end
-    	end
+		pressedCodes[code] = nil
+	end
 end
