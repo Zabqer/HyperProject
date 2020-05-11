@@ -260,7 +260,7 @@ function libthread.createProcess(options)
 		options.name = options.name or options.exe
 		local reason
 		options.exe, reason = loadfile(options.exe)
-		if not f then
+		if not options.exe then
 			return nil, reason
 		end
 	end

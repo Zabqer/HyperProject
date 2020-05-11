@@ -71,7 +71,7 @@ end
 function GLOBAL.os.sleep(time)
 		checkArg(1, time, "number", "nil")
 		thisThread.deadline = computer.uptime() + (time or 0)
-		yield()
+		coroutine.yield()
 end
 
 function GLOBAL.os.exit(code)
