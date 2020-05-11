@@ -34,6 +34,8 @@ kernelLogger = {
 	end
 }
 
+local cb = component.list("chat_box")()
+
 function kernelLog(level, ...)
 		local args = table.pack(...)
 		for i = 1, #args do
@@ -45,6 +47,9 @@ function kernelLog(level, ...)
 		local data = extend(level, table.unpack(args))
 		if dprint then
 			dprint(data)
+		end
+		if cb then
+			component.invoke(cb, "say", data)
 		end
 		kernelLogger:write(data)
 end
