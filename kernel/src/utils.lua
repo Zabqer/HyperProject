@@ -71,7 +71,7 @@ end
 function GLOBAL.os.sleep(time)
 		checkArg(1, time, "number", "nil")
 		thisThread.deadline = computer.uptime() + (time or 0)
-		coroutine.yield()
+		yield()
 end
 
 function GLOBAL.os.exit(code)
@@ -131,7 +131,7 @@ local libcomputer = {
 		pullSignal = function (timeout)
 				checkArg(1, timeout, "number", "nil")
 				thisThread.deadline = computer.uptime() + (timeout or math.huge)
-				return coroutine.yield("signal")
+				return waitEvent("signal")
 		end,
 		shutdown = computer.shutdown
 }

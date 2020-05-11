@@ -42,8 +42,6 @@ function main(...)
 			panic(reason)
 		end
 		init.workingDirectory = "/"
-		init.stdout = kernelLogger
-		init.stderr = kernelLogger
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
 
 		local logf = filesystem.open("/kernel.log", "w")
@@ -54,6 +52,8 @@ function main(...)
 				logf:write(data .. "\n")
 			end
 		}
+		init.stdout = kernelLogger
+		init.stderr = kernelLogger
 
 		-- Move to threading???
 

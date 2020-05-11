@@ -132,7 +132,6 @@ function bufferMethods:read(...)
 		if self.w or self.a then
 				bufferMethods.flush(self)
 		end
---	yield()
 		local function read(i, arg)
 				checkArg(i, arg, "number", "string")
 				if type(arg) == "number" then
@@ -178,7 +177,6 @@ function bufferMethods:write(...)
 		if not self.w and not self.a then
 				return nil, "write mode was not enabled for this stream"
 		end
---	yield()
 		local args = table.pack(...)
 		for i = 1, #args do
 				if type(args[i]) == "number" then

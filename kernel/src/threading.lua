@@ -135,6 +135,9 @@ function pushEvent(name, ...)
 end
 
 function waitEvent(name, ...)
+	if thisThread == kernelThread then
+		panic("Attempt to wait event from kernel thread")
+	end
 	return coroutine.yield(name, ...)
 end
 
