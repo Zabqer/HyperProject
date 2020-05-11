@@ -258,7 +258,11 @@ function bufferMethods:size()
 		return size
 end
 
-function buffer(stream, mode)
+function bufferMethods:stream()
+	return self.stream
+end
+
+function buffer(stream, mode, name, methods)
 		checkArg(1, stream, "table")
 		checkArg(2, mode, "string", "nil")
 		mode = mode or "r"
@@ -275,7 +279,7 @@ function buffer(stream, mode)
 				assert(m == "r" or m == "w" or m == "a" or m == "b", "bad argument #2 (r, w, a, b expected got " .. m .. ")")
 				obj[m] = true
 		end
-		return protectObject(obj, bufferMethods, "Stream")
+		return protectObject(obj, methods and AssignTable(methods, bufferMethods) or bufferMethods, name or "Stream")
 end
 
 local libbuffer = buffer

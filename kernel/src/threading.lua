@@ -32,7 +32,9 @@ function createProcess(f, name, parent, user, paused, ...)
 		threads = {},
 		parent = parent,
 		user = user,
+		handlers = {},
 		workingDirectory = "/",
+		terminal = parent and parent.terminal,
 		envvar = parent and setmetatable({}, {__index=parent.envvar}) or {}
 	}
 	if parent then
@@ -85,7 +87,10 @@ function createThread(f, name, process, paused, ...)
 	return thread
 end
 
+-- TODO scheduler will call thread callbacks in thread environment when next thread resume!!!
+
 function kill(pid)
+	-- TODO close process fd
 	local thread = threads[pid]
  	kernelLog(Log.DEBUG, "Killed", thread.process.thread == thread and "process" or "thread", "pid:", thread.pid, "name:", thread.name)
 	if thread.process.thread == thread then
@@ -144,6 +149,10 @@ function addKenrelEventHandler(data, callback)
 end
 
 local libthread = {}
+
+function libthread.onSignal(sig, callback)
+	thisThread.process.handlers[sig] = callback
+end
 
 processMethods = {}
 local iosMethods = {}
@@ -205,12 +214,26 @@ function processMethods:join()
 	waitEvent("kill", self.process.pid)
 end
 
+-- TODO delay to scheduler
+
+function sendSignal(process, sig)
+	if process.handlers[sig] then
+		local prevTh = thisThread
+		thisThread = process.thread
+		-- TODO pcall handler
+		process.handlers[sig]()
+		thisThread = prevTh
+	end
+end
+
 function processMethods:signal(sig)
-	local allowed = {"kill"}
+	local allowed = {"kill", "interrupt"}
 	for _, a in ipairs(allowed) do
 		if a == sig then
 			if a == "kill" then
 				kill(self.process.pid)
+			else
+				sendSignal(self.process, sig)
 			end
 			return true
 		end
@@ -228,17 +251,24 @@ function threadMethods:info()
 	}, true, false)
 end
 
-function libthread.createProcess(f, name, ...)
-	checkArg(1, f, "string", "function")
-	if type(f) == "string" then
-		name = name or f
+function libthread.createProcess(options)
+	-- TODO check args
+	if type(options.exe) == "string" then
+		options.name = options.name or options.exe
 		local reason
-		f, reason = loadfile(f)
+		options.exe, reason = loadfile(options.exe)
 		if not f then
 			return nil, reason
 		end
 	end
-	local process = createProcess(f, name, thisThread.process, thisThread.process.user, true, ...)
+	local process = createProcess(options.exe, options.name, thisThread.process, thisThread.process.user, true, table.unpack(options.args or {}))
+	if options.tty then
+		process.terminal = options.tty
+		ptys[options.tty.index()].slave.process = process
+	end
+	process.stdin = options.stdin or options.tty
+	process.stdout = options.stdout or options.tty
+	process.stderr = options.stderr or options.tty
 	return protectObject({
 		process = process
 	}, processMethods, "Process")

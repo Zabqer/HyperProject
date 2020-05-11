@@ -8,6 +8,17 @@ local UserSpace = Config.disableUserSpace and GLOBAL or setmetatable({}, {__inde
 
 function nullFunction() end
 
+function AssignTable(t1, t2)
+	local t = {}
+	for k, v in pairs(t1) do
+		t[k] = v
+	end
+	for k, v in pairs(t2) do
+		t[k] = v
+	end
+	return t
+end
+
 function protectObject(object, methods, name)
 		return setmetatable({}, {
 				__metatable = name or "Object",
@@ -61,6 +72,11 @@ function GLOBAL.os.sleep(time)
 		checkArg(1, time, "number", "nil")
 		thisThread.deadline = computer.uptime() + (time or 0)
 		coroutine.yield()
+end
+
+function GLOBAL.os.exit(code)
+	kill(thisThread.process.pid)
+	-- TODO yield!!! but we can't because we don't fully work in this thread env
 end
 
 local rtype = type

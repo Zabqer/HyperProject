@@ -17,16 +17,23 @@ function createTty(gpu, screen)
 	local master, slave = os.pty()
 
 	local keyboard = component.invoke(screen, "getKeyboards")[1]
-	local rk = assert(thread.createProcess("/sbin/readkey.lua", _, keyboard))
-	local io = rk.IO()
-	io.stdout = master
+	local rk = assert(thread.createProcess({
+		exe = "/sbin/readkey.lua",
+		args = {keyboard},
+		stdout = master
+	}))
 
-	local gt = assert(thread.createProcess("/sbin/getty.lua", _, gpu, screen))
-	local io = gt.IO()
-	io.stdin = master
+	local gt = assert(thread.createProcess({
+		exe = "/sbin/getty.lua",
+		args = {gpu, screen},
+		stdin = master
+	}))
 	
 	-- slave.index()
-	local l = assert(thread.createProcess("/sbin/login.lua", _, 0))
+	local l = assert(thread.createProcess({
+		exe = "/sbin/login.lua",
+		tty = slave
+	}))
 
 	rk:run()
 	gt:run()

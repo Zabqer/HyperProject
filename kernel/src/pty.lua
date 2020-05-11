@@ -4,7 +4,8 @@
 		Description: Provides pseudo terminals;
 ]]--
 
-local allocator, ptys = createAllocator()
+local allocator
+allocator, ptys = createAllocator()
 
 function os.pty()
 	local pty = allocator:new()
@@ -16,7 +17,8 @@ function os.pty()
 		write = function (self, data)
 			for c in data:gmatch(".") do
 				if c == "\x03" then
-					-- SEND SIGNAL TO SLAVE!!
+					sendSignal(self.pty.slave.process, "interrupt")
+					return
 				end
 			end
 			return self.i:write(data)
@@ -36,6 +38,9 @@ function os.pty()
 		end,
 		close = function (self)
 			panic("SLAVE CLOSE")
+		end,
+		index = function (self)
+			return self.pty.index
 		end
 	}
 	pty.slave = slave
@@ -43,7 +48,7 @@ function os.pty()
 	master.i, slave.o = createPipe()
 	slave.i, master.o = createPipe()
 
-	local m, s = buffer(master, "rw"), buffer(slave, "rw")
+	local m, s = buffer(master, "rw", "PtyMaster"), buffer(slave, "rw", "PtySlave", {index = function (self) return pty.index end})
 
 	m:setvbuf("no")
 	s:setvbuf("no")

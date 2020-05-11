@@ -4,7 +4,6 @@ local input = io.input()
 local thread = require("thread")
 
 local gpu, screen = ...
-
 -- Maybe move to component.proxy?
 
 cx = 1

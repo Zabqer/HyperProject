@@ -13,7 +13,7 @@ _  __  / _  /_/ /__  /_/ /  __/  /   / /_/ /____/ /
                       Maded by Zabqer with love
 ]]--
 
-KernelVersion = "0.0.0.1"
+KernelVersion = "0.0.2.0 alpha"
 
 GLOBAL._OSVERSION = "HyperKernel " .. KernelVersion
 

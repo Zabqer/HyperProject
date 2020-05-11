@@ -126,19 +126,16 @@ function sh.execute(line)
 	if not filename then
 		return nil, reason
 	end
-	local th, reason = thread.createProcess(filename, _, table.unpack(command.args))
+	local th, reason = thread.createProcess({
+		exe = filename,
+		args = command.args,
+		stdin = io.stdin,
+		stdout = io.stdout,
+		stderr = io.stderr
+	})
 	if not th then
 		return nil, reason
 	end
-	-- COPY IOS 
-	local ios = th:IO()
-	ios.stdin = io.stdin
-	-- ios.stdin = io.finder(io.stdin, "\x1bC", function () -- interrupt
-	-- 	dprint("SIGINT!!")
-	-- 	th:kill()
-	-- end)
-	ios.stdout = io.stdout
-	ios.stderr = io.stderr
 	-- th:onKill(function (pid)
 	-- 	io.error():write("Killed " .. pid)
 	-- end)

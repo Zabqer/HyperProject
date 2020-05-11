@@ -3,7 +3,13 @@ local thread = require("thread")
 local user = require("user")
 
 
-local index = ...
+local index = 0--...
+
+local shell
+
+thread.onSignal("interrupt", function ()
+	shell:signal("interrupt")
+end)
 
 while true do
 	term.clear()
@@ -32,14 +38,14 @@ while true do
 	end
 	os.setenv("USER", u.login)
 
-	-- get user shell
-	local shell = assert(thread.createProcess(u.shell))
-	shio = shell:IO()
-	shio.stdout = io.stdout
-	shio.stdin = io.stdin
-	shio.stderr = io.rewriter(function (data)
-		return "\x1b[91m" .. data .. "\x1b[39m"
-	end, io.stdout)
+	shell = assert(thread.createProcess({
+		exe = u.shell,
+		stdin = io.stdin,
+		stdout = io.stdout,
+		stderr = io.rewriter(function (data)
+			return "\x1b[91m" .. data .. "\x1b[39m"
+		end, io.stdout)
+	}))
 	shell:setUser(u.id)
 	shell:run()
 	shell:join()
