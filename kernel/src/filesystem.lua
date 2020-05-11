@@ -12,7 +12,7 @@ local function segmentate(path)
 		local segments = {}
 		for segment in path:gmatch("[^/]+") do
 				if segment == ".." then
-						table.remove(parts)
+						table.remove(segments)
 				elseif segment ~= "." then
 						table.insert(segments, segment)
 				end
@@ -32,6 +32,10 @@ end
 
 function PathMethods:absolute()
 	return (self.absolute and "/" or thisThread.process.workingDirectory) .. table.concat(self.segments, "/")
+end
+
+function PathMethods:path()
+	return (self.absolute and "/" or thisThread.process.workingDirectory) .. table.concat(table.pack(table.unpack(self.segments, 1, #self.segments - 1)), "/")
 end
 
 function PathMethods:filename()
@@ -66,10 +70,14 @@ end
 
 function PathMethods:at(index)
 	checkArg(1, index, "number")
+	if index < 0 then
+		index = #self.segments - index
+	end
 	if index > 0 and index <= #self.segments then
 		return self.segments[index]
 	end
 end
+
 
 local function Path(path)
 		local obj = {}
@@ -151,6 +159,22 @@ function filesystem.mount(path, proxy)
 		node.kernel_driver = type(proxy) == "table"
 		kernelLog(Log.INFO, "Filesystem", proxy, "mounted at", path.string())
 		return true
+end
+
+function filesystem.path(path)
+	return Path(path).path()
+end
+
+function filesystem.ext(path)
+	return Path(path).filename():match("^.+%.(.+)$")
+end
+
+function filesystem.file(path)
+	return Path(path).filename():match("^(.+)%..+$")
+end
+
+function filesystem.filename(path)
+	return Path(path).filename()
 end
 
 function filesystem.exists(path)

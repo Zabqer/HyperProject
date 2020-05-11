@@ -8,6 +8,8 @@ local gpu, screen = ...
 
 cx = 1
 cy = 1
+scx = 1
+scy = 1
 
 local w, h = component.invoke(gpu, "maxResolution")
 
@@ -94,22 +96,22 @@ controls = {
 			blinking = false
 		end
 	end,
-	-- ["[91m"] = function()
-	-- 	fg = 0xFF0000
-	-- 	component.invoke(gpu, "setForeground", fg)
-	-- end,
-	-- ["[39m"] = function()
-	-- 	fg = deffg
-        --         component.invoke(gpu, "setForeground", fg)
-	-- end,
-	-- ["[92m"] = function()
-	-- 	fg = 0x00FF00
-        --         component.invoke(gpu, "setForeground", fg)
-	-- end,
-	-- ["[96m"] = function()
-	-- 	fg = 0x00FFFF
-        --         component.invoke(gpu, "setForeground", fg)
-	-- end,
+	[{"%[", "%d*", "D"}] = function (_, n)
+		cx = cx - tonumber(n or 1)
+		checkCord()
+	end,
+	[{"%[K"}] = function ()
+		component.invoke(gpu, "fill", cx, cy, w - cx, 1, " ")
+	end,
+	[{"%[", "[su]"}] = function (_, t)
+		if t == "s" then
+			scx = cx
+			scy = cy
+		else
+			cx = scx
+			cy = scy
+		end
+	end,
 	[{"%[2J"}] = function()
 		cx, cy = 1, 1
 		component.invoke(gpu, "fill", 1, 1, w, h, " ")

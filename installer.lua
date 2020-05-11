@@ -37,6 +37,7 @@ function buildKernel()
 		"component",
 		"dev_filesystem",
 		"driver_chatbox",
+		"pty",
 		"buffer",
 		"config",
 		"event",

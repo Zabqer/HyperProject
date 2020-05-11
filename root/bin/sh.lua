@@ -16,6 +16,7 @@ end)
 while true do
 	io.write(sh.expand("$PS"))
 	local line = term.read({
+		hint = sh.hintHandler
 	})
      	if not line then
 		io.write("exit\n")
@@ -23,12 +24,14 @@ while true do
 	elseif line == "exit" then
 		return
     	end
-    	th, result = sh.execute(line)
-	if not th then
-		io.error():write(result .. "\n")
-	else
-		currentProcess = th
-		th:join()
-		currentProcess = nil
-    	end
+	if #line > 0 then 
+		th, result = sh.execute(line)
+		if not th then
+			io.error():write(result .. "\n")
+		else
+			currentProcess = th
+			th:join()
+			currentProcess = nil
+		end
+	end
 end

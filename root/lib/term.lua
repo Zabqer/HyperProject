@@ -9,28 +9,63 @@ function term.read(options)
 	local input = options.input or io.input()
 	term.blinkOn()
 	local str = ""
+	local completions
+	local compX, compY
+	function resetCompletions()
+		completions = nil
+	end
 	while true do
 		local char = input:read(1)
 		if not char then
-			dprint("CLOSED")
 			return nil
 		elseif #str == 0 and char == "\x04" then
-			dprint("EOT CHAR")
 			return nil
+		elseif char == "\t" and options.hint then
+			-- TODO make completion like bash
+			if not completions then
+				completions = options.hint(str, #str + 1) or {}
+			end
+			if #completions > 1 then
+				term.saveCursor()
+				print()
+				print(table.unpack(completions))
+				term.restoreCursor()
+			elseif #completions == 1 then
+				local x = #str
+				str = completions[1]
+				io.write("\x1b[" .. (x) .. "D\x1b[K" .. completions[1])
+			end
+			-- local cur, completion = next(completions, lastCompletion)
+			-- lastCompletion = cur
+			-- if completion then
+			-- 	local x = #str
+			-- 	str = completion
+			-- 	io.write("\x1b[" .. (x) .. "D\x1b[K" .. completion)
+			-- end
 		elseif char == "\n" then
 			io.write(char)
 			term.blinkOff()
 			return str
 		elseif char == "\b" then
+			resetCompletions()
 			if unicode.len(str) > 0 then
 				io.write(char)
 				str = unicode.sub(str, 1, -2)
 			end
 		else
+			resetCompletions()
 			io.write(hint or char)
 			str = str .. char
 		end
 	end
+end
+
+function term.saveCursor()
+	writeControl("[s")
+end
+
+function term.restoreCursor()
+	writeControl("[u")
 end
 
 function term.clear()
