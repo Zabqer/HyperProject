@@ -1,11 +1,11 @@
 --[[
 		Name: pty;
-		Depends: [allocator, utils];
+		Depends: [dev_filesystem, allocator, utils];
 		Description: Provides pseudo terminals;
 ]]--
 
 local allocator
-allocator, ptys = createAllocator()
+allocator, ptys = createAllocator(true, true)
 
 function os.pty()
 	local pty = allocator:new()
@@ -48,10 +48,33 @@ function os.pty()
 	master.i, slave.o = createPipe()
 	slave.i, master.o = createPipe()
 
-	local m, s = buffer(master, "rw", "PtyMaster"), buffer(slave, "rw", "PtySlave", {index = function (self) return pty.index end})
+	local m, s = buffer(master, "rw", "PtyMaster"), buffer(slave, "rw", "PtySlave", {index = function (self) return tonumber(pty.index) end})
 
 	m:setvbuf("no")
 	s:setvbuf("no")
 
 	return m, s
 end
+
+devfs.data.pty = setmetatable({
+	__file = false
+}, {
+	__index = function (_, key)
+		return ptys[key] and {
+			__file = true,
+			read = function (_, ...)
+				return ptys[key].master.o:read(...)
+			end,
+			write = function (_, ...)
+				return ptys[key].master.i:write(...)
+			end
+		}
+	end,
+	__pairs = function ()
+		local n
+		return function()
+			n = next(ptys, n)
+			return n and tostring(n)
+		end
+	end
+})

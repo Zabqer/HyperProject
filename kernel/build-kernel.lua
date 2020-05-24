@@ -17,6 +17,8 @@ local kernelPath = "kernel.lua"
 local sources = {
 		"src/allocator.lua",
 		"src/driver_chatbox.lua",
+		"src/driver_drive.lua",
+		"src/hyperfs_driver.lua",
 		"src/component.lua",
 		"src/log.lua",
 		"src/config.lua",
@@ -65,7 +67,7 @@ for _, sourcePath in pairs(sources) do
 						error("Can't get name of module: " .. sourcePath)
 				end
 				module.description = data:match("Description:%s([%w_ ]+);")
-				local deps = data:match("Depends:%s*%[([%w,%s]*)%];")
+				local deps = data:match("Depends:%s*%[([%w,%s_]*)%];")
 				if deps then
 						module.dependicles = load("return{" .. deps:gsub("[%w_]+", "\"%1\"") .. "}")()
 				end
@@ -95,14 +97,15 @@ local handled = {}
 
 local function handleModule(module)
 		if not handled[module] then
+				verbose("Handling > " .. module.name)
 				handled[module] = true
-				verbose(">> " .. module.name)
 				if module.dependicles then
+						verbose("Require", table.unpack(module.dependicles))
 						for _, dep in ipairs(module.dependicles) do
 								handleModule(modules[dep])
 						end
 				end
-				verbose(">>> " .. module.name)
+				verbose("Handled >> " .. module.name)
 				table.insert(code, module.code)
 		end
 end

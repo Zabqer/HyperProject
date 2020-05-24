@@ -2,6 +2,7 @@ print("Initializing...")
 
 local event = require("event")
 local thread = require("thread")
+local filesystem = require("filesystem")
 
 os.setenv("HOSTNAME", "myhost")
 
@@ -39,7 +40,7 @@ function createTty(gpu, screen)
 	gt:run()
 	l:run()
 
-	l:join()
+--	l:join()
 
 	--pi, po = io.pts()
 	-- local o1, i1 = io.pipe()
@@ -91,7 +92,11 @@ end
 
 event.on("component_added", eventHandler)
 for address, ctype in component.list() do
+	-- TODO remove later
+	computer.pushSignal("component_added", address, ctype)
     eventHandler(_, address, ctype)
 end
+os.sleep(1)
+		assert(filesystem.mount("/home/", "/dev/drive/0"))
 --TODO replace os sleep
 os.sleep(9999999999999)

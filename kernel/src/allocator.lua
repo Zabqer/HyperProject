@@ -16,7 +16,7 @@ function createAllocator(useString, startAtZero)
 		repeat
 			self.index = self.index + 1
 		until not self.list[useString and tostring(self.index) or self.index]
-		element.index = index
+		element.index = useString and tostring(index) or index
 		return element
 	end
 	function allocator:remove(element)

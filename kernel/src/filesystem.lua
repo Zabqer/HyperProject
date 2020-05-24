@@ -4,6 +4,8 @@
 		Description: Provides virtual filesystem methods;
 ]]--
 
+filesystems = {}
+
 local rootNode = {name="", nodes={}}
 
 filesystem = {}
@@ -141,8 +143,27 @@ function filesystemHandle:write(data)
 	return self.driver.write(self.handle, data)
 end
 
+-- TODO
+function filesystemHandle:seek(whence, offset)
+	return self.driver.seek(self.handle, whence, offset)
+end
+
 function filesystemHandle:close()
 		return self.driver.close(self.handle)
+end
+
+function tryMountFilesystem(path)
+	local handle, reason = filesystem.open(path)
+	if not handle then
+		return nil, reason
+	end
+	for name, fs in pairs(filesystems) do
+		local d = handle:read(#fs.magic)
+		if fs.magic == d then
+			return fs.open(handle)
+		end
+	end
+	return nil, "unknown filesystem"
 end
 
 function filesystem.mount(path, proxy)
@@ -154,9 +175,22 @@ function filesystem.mount(path, proxy)
 				return false, "another file system mounted here"
 		end
 		node = createNode(node, path)
-		node.driver = type(proxy) == "table" and proxy or component.proxy(proxy)
-		-- push string to filesystem component, but to own drivers we push Path
-		node.kernel_driver = type(proxy) == "table"
+		if type(proxy) == "table" then
+			node.driver = proxy
+			node.kernel_driver = true
+		else
+			if component.type(proxy) == "filesystem" then
+				node.driver = component.proxy(proxy)
+				node.kernel_driver = false
+			else
+				local driver, reason = tryMountFilesystem(proxy)
+				if not driver then
+					return false, reason
+				end
+				node.driver = driver
+				node.kernel_driver = true
+			end
+		end
 		kernelLog(Log.INFO, "Filesystem", proxy, "mounted at", path.string())
 		return true
 end
@@ -200,7 +234,7 @@ function filesystem.list(path)
 		checkArg(1, path, "string")
 		local node, fspath = getNode(path)
                 if not node then
-			return false
+			return nil, fspath
 		end
 		local files = {}
 		if #fspath == 0 then
@@ -208,7 +242,6 @@ function filesystem.list(path)
 				table.insert(files, n.name)
 			end
 		end
-
         	local fsfiles = node.driver.list(node.kernel_driver and fspath or fspath.string())
 		if fsfiles then
 			for _, f in pairs(fsfiles) do

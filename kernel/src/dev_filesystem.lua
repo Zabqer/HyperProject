@@ -35,8 +35,8 @@ function devfs.open(path)
 	end
 	local handle = allocator:new()
 	handle.node = node
-	if handle.open then
-		handle.open(handle)
+	if handle.node.open then
+		handle.node.open(handle)
 	end
 	return handle.index
 end
@@ -53,6 +53,13 @@ function devfs.write(index, ...)
 		return false, "operation not permitted"
 	end
 	return handles[index].node.write(handles[index], ...)
+end
+
+function devfs.seek(index, ...)
+	if not handles[index].node.seek then
+		return false, "operation not permitted"
+	end
+	return handles[index].node.seek(handles[index], ...)
 end
 
 function devfs.close(index)

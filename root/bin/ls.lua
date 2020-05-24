@@ -5,7 +5,7 @@ local path = ...
 
 path = path or "."
 
-for _, name in ipairs(filesystem.list(path)) do
+for _, name in ipairs(assert(filesystem.list(path))) do
 	if filesystem.isDirectory(name) then
 		term.lightcyanFg()
 	else

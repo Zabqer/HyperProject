@@ -267,7 +267,7 @@ function libthread.createProcess(options)
 	local process = createProcess(options.exe, options.name, thisThread.process, thisThread.process.user, true, table.unpack(options.args or {}))
 	if options.tty then
 		process.terminal = options.tty
-		ptys[options.tty.index()].slave.process = process
+		ptys[tostring(options.tty.index())].slave.process = process
 	end
 	process.stdin = options.stdin or options.tty
 	process.stdout = options.stdout or options.tty

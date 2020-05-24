@@ -78,7 +78,16 @@ controlBuffer = ""
 controls = {
 	[{"%[", "[%d;]*", "m"}] = function(_, codes)
 		codes = tonumber(codes)
-		local colors = {0x0,0xff0000,0x00ff00,0xffff00,0x0000ff,0xff00ff,0x00B6ff,0xffffff}
+		local colors = {
+			0x000000,
+			0xff0000,
+			0x00ff00,
+			0xffff00,
+			0x0000ff,
+			0xff00ff,
+			0x00B6ff,
+			0xffffff
+		}
 		if codes == 0 then
 			setFgColor(deffg)
 		elseif codes >= 30 and codes <= 37 then

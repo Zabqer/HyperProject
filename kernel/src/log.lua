@@ -1,5 +1,6 @@
 --[[
 		Name: log;
+		Depends: [config];
 		Description: Provides logging methods
 ]]--
 
@@ -34,15 +35,15 @@ kernelLogger = {
 	end
 }
 
-local cb = component.list("chat_box")()
+local cb = Config.logToChatBox and component.list("chat_box")()
 
 function kernelLog(level, ...)
 		local args = table.pack(...)
 		for i = 1, #args do
 				args[i] = tostring(args[i])
 		end
-		if level < 1 then
---			return
+		if level < Config.logLevel or 0 then
+		--	return
 		end
 		local data = extend(level, table.unpack(args))
 		if dprint then
