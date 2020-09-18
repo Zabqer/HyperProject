@@ -10,6 +10,8 @@ local rootNode = {name="", nodes={}}
 
 filesystem = {}
 
+-- TODO NEED TO REWORK!!!
+
 local function segmentate(path)
 		local segments = {}
 		for segment in path:gmatch("[^/]+") do
@@ -42,6 +44,18 @@ end
 
 function PathMethods:filename()
 	return self.segments[#self.segments]
+end
+
+function PathMethods:makeAbsolute()
+	if not self.absolute then
+		self.absolute = true
+		local segs = segmentate(thisThread.process.envvar["PWD"])
+		local i = 0
+		for _, s in ipairs(segs) do
+			table.insert(self.segments, s)
+			i = i + 1
+		end
+	end
 end
 
 function PathMethods:append(path, index)
@@ -90,6 +104,7 @@ end
 local function getNode(path)
 	-- Maybe rewrite?
 	path = type(path) == "string" and Path(path) or path
+	path.makeAbsolute()
 	local outerpath = Path("")
 	local node = rootNode
 	while true do
@@ -114,13 +129,29 @@ local function getNode(path)
 	end
 end
 
--- local function printNodes(node, i)
--- 	i = i or 0
--- 	dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
--- 	for _, n in pairs(node.nodes) do
--- 		printNodes(n, i + 1)
--- 	end
--- end
+local function printNodes(node, i)
+	-- i = i or 0
+	-- dprint(string.rep(" ", i) .. ">" .. (node.name == "" and "/" or node.name) .. "<")
+	-- for _, n in pairs(node.nodes) do
+	-- 	printNodes(n, i + 1)
+	-- end
+end
+
+function GLOBAL.debugFs()
+	dprint("==== DEBUG FS ====")
+	local function d(path, depth)
+		dprint(string.rep(" ", depth) .. (Path(path):filename() or "") .. (filesystem.isDirectory(path) and "/" or ""))
+		if filesystem.isDirectory(path) then
+			for _, f in ipairs(filesystem.list(path)) do
+				local p = Path(path)
+				p:append(f)
+				d(tostring(p), depth + 1)
+			end
+		end
+	end
+	d("/", 0)
+	dprint("==================")
+end
 
 local function createNode(node, path)
 	for _, f in pairs(path) do
@@ -220,13 +251,51 @@ function filesystem.exists(path)
 		return node.driver.exists(node.kernel_driver and fspath or fspath.string())
 end
 
-function filesystem.isDirectory(path)
+function filesystem.makeDirectory(path)
 		checkArg(1, path, "string")
 		local node, fspath = getNode(path)
 		if not node then
-				return false
+			return false
 		end
-		return node.driver.isDirectory(node.kernel_driver and fspath or fspath.string())
+		if #fspath == 0 then
+			return true
+		end
+		local p = Path("")
+		for _, f in pairs(fspath) do
+			p:append(f)
+			if not node.driver.exists(node.kernel_driver and p or p.string()) then
+				local success, reason = node.driver.makeDirectory(node.kernel_driver and p or p.string())
+				if not success then
+					return false, reason
+				end
+			else
+				if not node.driver.isDirectory(node.kernel_driver and p or p.string()) then
+					return false, "file is not a directory"
+				end
+			end
+		end
+		return true
+end
+
+function filesystem.size(path)
+		checkArg(1, path, "string")
+		local node, fspath = getNode(path)
+		if not node then
+			return false
+		end
+		return node.driver.size(node.kernel_driver and fspath or fspath.string())
+end
+
+function filesystem.isDirectory(path)
+	checkArg(1, path, "string")
+	local node, fspath = getNode(path)
+	if not node then
+		return false
+	end
+	if #fspath == 0 then
+		return true
+	end
+	return node.driver.isDirectory(node.kernel_driver and fspath or fspath.string())
 end
 
 
@@ -237,15 +306,19 @@ function filesystem.list(path)
 			return nil, fspath
 		end
 		local files = {}
-		if #fspath == 0 then
-			for _, n in pairs(node.nodes) do
-				table.insert(files, n.name)
-			end
-		end
-        	local fsfiles = node.driver.list(node.kernel_driver and fspath or fspath.string())
-		if fsfiles then
-			for _, f in pairs(fsfiles) do
-				table.insert(files, f)
+		-- if node.nodes and #fspath == 0 then
+		-- 	for _, n in pairs(node.nodes) do
+		-- 		table.insert(files, n.name)
+		-- 	end
+		-- end
+		if node.driver then
+			local fsfiles = node.driver.list(node.kernel_driver and fspath or fspath.string())
+			if fsfiles then
+				for _, f in pairs(fsfiles) do
+					if type(f) == "string" then
+						table.insert(files, f)
+					end
+				end
 			end
 		end
 		return files
@@ -260,14 +333,28 @@ function filesystem.open(path, mode)
 		if not node then
 				return nil, path
 		end
-		if ({r=true,rb=true})[mode] and not node.driver.exists(node.kernel_driver and fspath or fspath.string()) then
+		if ({r=true,rb=true})[mode] then
+			local exists
+			if node.kernel_driver then
+				exists = node.driver.exists(fspath, mode)
+			else
+				exists = node.driver.exists(fspath.string(), mode)
+			end
+			if not exists then
 				return nil, "file not found: " .. fspath.string()
+			end
 		end
-		local handle, reason = node.driver.open(node.kernel_driver and fspath or fspath.string(), mode)
+		local handle, reason
+		if node.kernel_driver then
+			handle, reason = node.driver.open(fspath, mode)
+		else
+			handle, reason = node.driver.open(fspath.string(), mode)
+		end
 		if not handle then
 				return nil, reason
 		end
 		local stream = {
+				path = fspath,
 				kernel_driver = node.kernel_driver,
 				driver = node.driver,
 				handle = handle

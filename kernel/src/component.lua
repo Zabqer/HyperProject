@@ -8,7 +8,7 @@ local drivers = {}
 
 -- TODO by uuid
 
-addKenrelEventHandler({"signal", "component_added"}, function (uuid, t)
+function componentAdded (uuid, t)
 	kernelLog(Log.DEBUG, "Component added", t, uuid)
 	t = t:gsub("_", "-")
 	if drivers[t] then
@@ -20,12 +20,14 @@ addKenrelEventHandler({"signal", "component_added"}, function (uuid, t)
 		local d = drivers[t].allocator:new()
 		d.__file = true
 		d.uuid = uuid
-		for k, v in pairs(drivers[t].add_callback()) do
+		for k, v in pairs(drivers[t].add_callback(uuid)) do
 			d[k] = v
 		end
 		kernelLog(Log.DEBUG, "Created device", uuid, "at path /dev/" .. t .. "/" .. d.index)
 	end
-end)
+end
+
+addKenrelEventHandler({"signal", "component_added"}, componentAdded)
 
 function register_driver(t, add_callback, remove_callback)
 	kernelLog(Log.DEBUG, "Register driver for", t)

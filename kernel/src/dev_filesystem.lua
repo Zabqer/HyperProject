@@ -74,6 +74,11 @@ function devfs.exists(path)
 	return not not node
 end
 
+function devfs.size(path)
+	local node = getNode(path)
+	return node.size and node.size(node) or 0
+end
+
 function devfs.list(path)
 	local node, result = getNode(path)
 	if not node then

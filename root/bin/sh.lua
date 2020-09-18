@@ -2,8 +2,7 @@ local term = require("term")
 local sh = require("sh")
 local thread = require("thread")
 
-os.setenv("PWD", "/")
-os.setenv("PS", sh.expand("\x1b[91m$USER\x1b[39m@\x1b[92m$HOSTNAME\x1b[39m $PWD $ "))
+os.setenv("PS", "\x1b[91m$USER\x1b[39m@\x1b[92m$HOSTNAME\x1b[39m $PWD $ ")
 
 local currentProcess
 
@@ -14,7 +13,7 @@ thread.onSignal("interrupt", function ()
 end)
 
 while true do
-	io.write(sh.expand("$PS"))
+	io.write(sh.expand(os.getenv("PS")))
 	local line = term.read({
 		hint = sh.hintHandler
 	})
@@ -28,7 +27,7 @@ while true do
 		th, result = sh.execute(line)
 		if not th then
 			io.error():write(result .. "\n")
-		else
+		elseif th ~= true then
 			currentProcess = th
 			th:join()
 			currentProcess = nil

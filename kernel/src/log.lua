@@ -24,7 +24,17 @@ local function extend(level, ...)
 				str = str .. " " .. s
 		end
 		local clock = math.floor(os.clock() * 1000) / 1000
-		return "[" .. clock .. "] [" .. levelName[level] .. "]" .. str
+		local color = ""
+		if dprint then
+			if level == Log.INFO then
+				color = "\x1b[34m"
+			elseif level == Log.WARNING then
+				color = "\x1b[33m"
+			elseif level == Log.ERROR then
+				color = "\x1b[31m"
+			end
+		end
+		return color .. "[" .. clock .. "] [" .. levelName[level] .. "]" .. str .. "\x1b[0m"
 end
 
 kernelLogger = {

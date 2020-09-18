@@ -7,6 +7,9 @@
 kernelThread = {
 	name = "kernel",
 	deadline = 0,
+	process = {
+		workingDirectory = "/"
+	}
 }
 
 thisThread = kernelThread
@@ -35,7 +38,9 @@ function createProcess(f, name, parent, user, paused, ...)
 		handlers = {},
 		workingDirectory = "/",
 		terminal = parent and parent.terminal,
-		envvar = parent and setmetatable({}, {__index=parent.envvar}) or {}
+		envvar = parent and setmetatable({}, {__index=parent.envvar}) or {
+			PWD = "/"
+		}
 	}
 	if parent then
 		table.insert(parent.processes, process)
@@ -242,6 +247,11 @@ function processMethods:signal(sig)
 		end
 	end
 	return false, "unknown signal"
+end
+
+function processMethods:setWorkingDirectory(path)
+	self.process.workingDirectory = path
+	self.process.envvar["PWD"] = path
 end
 
 local threadMethods = {}

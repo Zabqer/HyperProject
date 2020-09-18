@@ -89,6 +89,10 @@ function GLOBAL.io.pipe()
 		return wb, buffer(o, "r")
 end
 
+function GLOBAL.io.size(file)
+	return filesystem.size(file)
+end
+
 function GLOBAL.io.input(file)
 		if file then
 				if type(file) == "string" then

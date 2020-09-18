@@ -93,10 +93,9 @@ end
 event.on("component_added", eventHandler)
 for address, ctype in component.list() do
 	-- TODO remove later
-	computer.pushSignal("component_added", address, ctype)
+	-- computer.pushSignal("component_added", address, ctype)
     eventHandler(_, address, ctype)
 end
 os.sleep(1)
-		assert(filesystem.mount("/home/", "/dev/drive/0"))
 --TODO replace os sleep
 os.sleep(9999999999999)

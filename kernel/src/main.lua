@@ -18,7 +18,8 @@ KernelVersion = "0.0.2.0 alpha"
 GLOBAL._OSVERSION = "HyperKernel " .. KernelVersion
 
 function panic(str)
-	kernelLog(Log.ERROR, "Kernel panic: " .. str)
+	kernelLog(Log.ERROR, "Kernel panic: " .. tostring(str))
+	kernelLog(Log.ERROR, debug.traceback())
 	while true do computer.pullSignal(1) end
 end
 
@@ -27,11 +28,59 @@ function main(...)
 		kernelLog(Log.DEBUG, "[main] Starting kernel")
 		kernelLog(Log.INFO, "HyperKernel / " .. KernelVersion .. " / Zabqer")
 		kernelLog(Log.INFO, "[main] Mounting root filesystem")
+		filesystem.mount("/dev", devfs)
+		for address, ctype in component.list() do
+			componentAdded(address, ctype)
+		end
+		-- (function ()
+		-- 	local MAGIC = "\x28\xFF\xF0\xAA"
+		-- 	local SUPERBLOCK = [[<c4TTTTHTT]]
+                --
+		-- 	local INODE = [[<bTT]]
+                --
+		-- 	local TYPE_UNKNOWN = 0
+		-- 	local TYPE_FILE = 1
+		-- 	local TYPE_DIR = 2
+                --
+		-- 	local DIR_ENTRY = [[<Tz]]
+		-- 	local availableSize = filesystem.size("/dev/drive/0") - 512
+                --
+		-- 	local inodeSize = 64
+		-- 	local totalInodes = math.ceil(availableSize / 3 / inodeSize)
+		-- 	local blockSize = 64
+		-- 	local totalBlocks = math.ceil((availableSize - totalInodes * inodeSize) / blockSize)
+                --
+		-- 	local f = assert(filesystem.open("/dev/drive/0", "w"))
+                --
+		-- 	f:write(string.pack(
+		-- 	SUPERBLOCK,
+		-- 	MAGIC,
+		-- 	totalInodes,
+		-- 	totalBlocks,
+		-- 	totalInodes - 1,
+		-- 	totalBlocks,
+		-- 	blockSize,
+		-- 	1,
+		-- 	1
+		-- 	))
+                --
+		-- 	f:write(string.rep("\0", 512 - string.packsize(SUPERBLOCK)))
+                --
+		-- 	f:write(string.pack(
+		-- 	INODE,
+		-- 	TYPE_DIR,
+		-- 	0,
+		-- 	0
+		-- 	))
+                --
+		-- 	f:close()
+                --
+		-- end)()
+		-- success, reason = filesystem.mount("/", "/dev/drive/0")
 		success, reason = filesystem.mount("/", computer.getBootAddress())
 		if not success then
 			panic(reason)
 		end
-		filesystem.mount("/dev", devfs)
 		kernelLog(Log.DEBUG, "[main] Spawning init thread")
 		local init, reason = createProcess(function ()
 				kernelLog(Log.DEBUG, "[init] Init started")
@@ -44,9 +93,17 @@ function main(...)
 		init.workingDirectory = "/"
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
 
-		local logf = filesystem.open("/kernel.log", "w")
+		assert(filesystem.makeDirectory("/var/log"))
+		-- debugFs()
+
+		local logf, reason = filesystem.open("/var/log/kernel.log", "w")
+		if not logf then
+			panic(reason)
+		end
+		-- debugFs()
 
 		logf:write(kernelLogger.buffer)
+		-- debugFs()
 		kernelLogger = {
 			write = function (_, data)
 				logf:write(data .. "\n")

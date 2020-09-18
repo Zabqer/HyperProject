@@ -1,11 +1,12 @@
 local header = [[HyperBIOS/0.0.0.1]]
-local logo =
-[[----------------------
-/-- Cool logo here --/
-By Zabqer
-----------------------]]
+local logo = [[______  __                           ______________________________
+___  / / /____  ________________________  __ )___  _/_  __ \_  ___/
+__  /_/ /__  / / /__  __ \  _ \_  ___/_  __  |__  / _  / / /____ \ 
+_  __  / _  /_/ /__  /_/ /  __/  /   _  /_/ /__/ /  / /_/ /____/ / 
+/_/ /_/  _\__, / _  .___/\___//_/    /_____/ /___/  \____/ /____/  
+         /____/  /_/               by Zabqer with Love             ]]
 
-local config = {bootFrom="filesystem_address"}
+local config = {bootFrom=nil}
 
 local eeprom, gpu, screen = component.list("eeprom")(), component.list("gpu")(), component.list("screen")()
 
@@ -23,7 +24,8 @@ local function status() end
 
 if gpu and screen then
 		invoke(gpu, "bind", screen)
-		local w, h = invoke(gpu, "getResolution");
+		local w, h = 80, 25--invoke(gpu, "getMaxResolution");
+		invoke(gpu, "setResolution", w, h)
 		lines = {}
 		for line in logo:gmatch("[^\n]+") do
 				table.insert(lines, line)
@@ -74,7 +76,7 @@ local function tryBoot(address)
 						return nil, "cannot find init.lua"
 				end
 		else
-				return nil, "unsuported component type"
+				return nil, "unsuported component type `" .. type .. "`"
 		end
 end
 
@@ -89,7 +91,7 @@ end
 if not bootDevice then
 		status("Finding bootable devices...")
 		for address, _ in component.list() do
-				if bootDevce then
+				if bootDevice then
 						break
 				end
 				bootDevice = tryBoot(address)

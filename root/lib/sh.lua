@@ -109,12 +109,12 @@ end
 
 function sh.resolve(name)
 	if sh.buildin[name] then
-		return sh.buildin[name]
+		return sh.buildin[name], true
 	end
 	for dir in string.gmatch(os.getenv("PATH"), "([^;]+)") do
 		filename = string.gsub(dir, "?", name)
 		if filesystem.exists(filename) then
-			return filename
+			return filename, false
 		end
 	end
 	return nil, "no command found"
@@ -178,21 +178,26 @@ function sh.execute(line)
 	if not filename then
 		return nil, reason
 	end
-	local th, reason = thread.createProcess({
-		exe = filename,
-		args = command.args,
-		stdin = io.stdin,
-		stdout = io.stdout,
-		stderr = io.stderr
-	})
-	if not th then
-		return nil, reason
+	if reason then
+		filename(table.unpack(command.args))
+		return true
+	else
+		local th, reason = thread.createProcess({
+			exe = filename,
+			args = command.args,
+			stdin = io.stdin,
+			stdout = io.stdout,
+			stderr = io.stderr
+		})
+		if not th then
+			return nil, reason
+		end
+		-- th:onKill(function (pid)
+		-- 	io.error():write("Killed " .. pid)
+		-- end)
+		th:run()
+		return th
 	end
-	-- th:onKill(function (pid)
-	-- 	io.error():write("Killed " .. pid)
-	-- end)
-	th:run()
-	return th
 end
 
 return sh
