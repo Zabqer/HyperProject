@@ -74,6 +74,11 @@ function setFgColor(col)
 	component.invoke(gpu, "setForeground", col)
 end
 
+function setBgColor(col)
+	bg = col
+	component.invoke(gpu, "setBackground", col)
+end
+
 controlBuffer = ""
 controls = {
 	[{"%[", "[%d;]*", "m"}] = function(_, codes)
@@ -90,6 +95,10 @@ controls = {
 		}
 		if codes == 0 then
 			setFgColor(deffg)
+		elseif codes == 7 then
+			local f, b = fg, bg
+			setFgColor(b)
+			setBgColor(f)
 		elseif codes >= 30 and codes <= 37 then
 			setFgColor(colors[codes - 29])
 		elseif codes == 39 then
@@ -105,12 +114,24 @@ controls = {
 			blinking = false
 		end
 	end,
+	[{"%[", "%d*", "A"}] = function (_, n)
+		cy = cy - (tonumber(n) or 1)
+		checkCord()
+	end,
+	[{"%[", "%d*", "B"}] = function (_, n)
+		cy = cy + (tonumber(n) or 1)
+		checkCord()
+	end,
 	[{"%[", "%d*", "D"}] = function (_, n)
-		cx = cx - tonumber(n or 1)
+		cx = cx - (tonumber(n) or 1)
+		checkCord()
+	end,
+	[{"%[", "%d*", "C"}] = function (_, n)
+		cx = cx + (tonumber(n) or 1)
 		checkCord()
 	end,
 	[{"%[K"}] = function ()
-		component.invoke(gpu, "fill", cx, cy, w - cx, 1, " ")
+		component.invoke(gpu, "fill", cx, cy, w - cx + 1, 1, " ")
 	end,
 	[{"%[", "[su]"}] = function (_, t)
 		if t == "s" then
@@ -121,9 +142,22 @@ controls = {
 			cy = scy
 		end
 	end,
+	[{"%[", "%d+", ";", "%d+", "H"}] = function (_, x, _, y)
+		cx = math.max(1, math.min(w, tonumber(x)))
+		cy = math.max(1, math.min(h, tonumber(y)))
+		checkCord()
+	end,
+	[{"%[6n"}] = function ()
+		io.write("\x1b[" .. cx .. ";" .. cy .. "R")
+	end,
 	[{"%[2J"}] = function()
 		cx, cy = 1, 1
 		component.invoke(gpu, "fill", 1, 1, w, h, " ")
+	end,
+	-- Custom
+	[{"%[", "%d+", "sc"}] = function (_, y)
+		y = tonumber(y) or 0
+		component.invoke(gpu, "copy", 1, y, w, h - 1, 0, 1)
 	end
 }
 

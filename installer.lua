@@ -76,7 +76,12 @@ function copyRoot()
 		"sleep",
 		"signal",
 		"sh",
-		"clear"
+		"clear",
+		"edit",
+		"memory",
+		"pwd",
+		"mkdir",
+		"kconf"
 	}
 	local lib = {
 		"sh",

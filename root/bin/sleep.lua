@@ -1,7 +1,7 @@
 local thread = require("thread")
 local time = ...
 print("Sleeping", time)
-thread.onSignal("interrupt", function ()
+thread.attach("interrupt", function ()
 	os.exit(0)
 end)
 os.sleep(tonumber(time))

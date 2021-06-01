@@ -130,9 +130,7 @@ function main(...)
 			thread.running = false
 			if not result[1] or coroutine.status(thread.coroutine) == "dead" then
                 		kill(thread.pid)
-				if result[2] then
-					kernelLog(Log.ERROR, "Thread: [pid: " .. thread.pid .. "] died: " .. (result[2] or "unknown"))
-				end
+				kernelLog(Log.ERROR, "Thread: [pid: " .. thread.pid .. "] died: " .. (result[2] or "unknown"))
 			else
 				thread.awaiting = result[2]
 				thread.awaitingArgs = table.pack(table.unpack(result, 3))

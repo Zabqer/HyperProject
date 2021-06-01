@@ -17,8 +17,8 @@ local kernelPath = "kernel.lua"
 local sources = {
 		"src/allocator.lua",
 		"src/driver_chatbox.lua",
-		"src/driver_drive.lua",
-		"src/hyperfs_driver.lua",
+		-- "src/driver_drive.lua",
+		-- "src/hyperfs_driver.lua",
 		"src/component.lua",
 		"src/log.lua",
 		"src/config.lua",

@@ -7,7 +7,7 @@ local index = 0--...
 
 local shell
 
-thread.onSignal("interrupt", function ()
+thread.attach("interrupt", function ()
 	shell:signal("interrupt")
 end)
 

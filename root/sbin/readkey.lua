@@ -146,14 +146,16 @@ while true do
 			elseif code == keys.d then
 				output:write("\x04")
 			end
+		elseif code == keys.f1 then io.stdout:write("\x1bOP")
+		elseif code == keys.f2 then io.stdout:write("\x1bOQ")
+		elseif code == keys.home then io.stdout:write("\x1bOH")
+		elseif code == keys["end"] then io.stdout:write("\x1bOF")
+		elseif code == 200 then output:write("\x1b[A")
+		elseif code == 208 then output:write("\x1b[B")
+		elseif code == 205 then output:write("\x1b[C")
+		elseif code == 203 then output:write("\x1b[D")
 		elseif char ~= 0 and char ~= 127 then 
 			output:write(unicode.char(char))
-		else
-			if code == 200 then output:write("\x1b[A")
-			elseif code == 208 then ouput:write("\x1b[B")
-			elseif code == 205 then output:write("\x1b[C")
-			elseif code == 203 then output:write("\x1b[D")
-			end
 		end
 	else
 		pressedCodes[code] = nil

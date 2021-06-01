@@ -27,7 +27,8 @@ function createTty(gpu, screen)
 	local gt = assert(thread.createProcess({
 		exe = "/sbin/getty.lua",
 		args = {gpu, screen},
-		stdin = master
+		stdin = master,
+		stdout = master
 	}))
 	
 	-- slave.index()

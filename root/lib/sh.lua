@@ -117,7 +117,7 @@ function sh.resolve(name)
 			return filename, false
 		end
 	end
-	return nil, "no command found"
+	return nil, name .. ": no command found"
 end
 
 function getProgramms(start)

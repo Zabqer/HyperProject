@@ -128,6 +128,9 @@ function kill(pid)
 		nextPID = pid
 	end
 	pushEvent("kill", pid)
+	-- threads[pid].process.stdin.close()
+	-- threads[pid].process.stdout.close()
+	-- threads[pid].process.stderr.close()
 	threads[pid] = nil
 end
 
@@ -158,7 +161,7 @@ end
 
 local libthread = {}
 
-function libthread.onSignal(sig, callback)
+function libthread.attach(sig, callback)
 	thisThread.process.handlers[sig] = callback
 end
 
@@ -222,15 +225,13 @@ function processMethods:join()
 	waitEvent("kill", self.process.pid)
 end
 
--- TODO delay to scheduler
-
 function sendSignal(process, sig)
 	if process.handlers[sig] then
-		local prevTh = thisThread
-		thisThread = process.thread
-		-- TODO pcall handler
-		process.handlers[sig]()
-		thisThread = prevTh
+		-- SIMPLEST SOLUTION 
+		-- NEED REWRITE
+		createThread(process.handlers[sig], "signal handler", process, false)
+		-- process.handlers[sig]()
+		yield()
 	end
 end
 

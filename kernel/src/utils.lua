@@ -76,6 +76,7 @@ end
 
 function GLOBAL.os.exit(code)
 	kill(thisThread.process.pid)
+	yield()
 	-- TODO yield!!! but we can't because we don't fully work in this thread env
 end
 
@@ -133,13 +134,16 @@ local libcomputer = {
 				thisThread.deadline = computer.uptime() + (timeout or math.huge)
 				return waitEvent("signal")
 		end,
-		shutdown = computer.shutdown
+		shutdown = computer.shutdown,
+		freeMemory = computer.freeMemory,
+		totalMemory = computer.totalMemory
 }
 
 local libcomponent = {
 		list = component.list,
 		type = component.type,
-		invoke = component.invoke
+		invoke = component.invoke,
+		proxy = component.proxy
 }
 
 local libunicode = {
@@ -158,8 +162,11 @@ local package = {
 		preload = libs,
 		loading = {},
 		loaded = setmetatable({}, {__mode = "v"}),
-		searchers = {}
+		searchers = {},
+		path = "/lib/?.lua",
 }
+
+package.preload["package"] = package
 
 function package.searchpath(name, path, sep, rep)
 		checkArg(1, name, "string")

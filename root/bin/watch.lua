@@ -4,7 +4,7 @@ local thread = require("thread")
 
 local args = table.pack(...)
 
-thread.onSignal("interrupt", function ()
+thread.attach("interrupt", function ()
 	os.exit(0)
 end)
 
