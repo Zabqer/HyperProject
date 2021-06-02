@@ -298,6 +298,15 @@ function filesystem.isDirectory(path)
 	return node.driver.isDirectory(node.kernel_driver and fspath or fspath.string())
 end
 
+function filesystem.lastModified(path)
+		checkArg(1, path, "string")
+		local node, fspath = getNode(path)
+		if not node then
+			return false
+		end
+		return node.driver.lastModified(node.kernel_driver and fspath or fspath.string())
+end
+
 
 function filesystem.list(path)
 		checkArg(1, path, "string")

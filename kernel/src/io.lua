@@ -26,7 +26,6 @@ end
 local pipeInputMethods, pipeOutputMethods = {}, {}
 
 function pipeInputMethods:write(data)
-		yield()
 		if self.closed then
 				return false
 		end
@@ -39,7 +38,6 @@ function pipeInputMethods:write(data)
 end
 
 function pipeInputMethods:close()
-		yield()
 		if self.closed then
 				return false
 		end
@@ -49,7 +47,6 @@ function pipeInputMethods:close()
 end
 
 function pipeOutputMethods:read(count)
-		yield()
 		if not self.buffer or #self.buffer == 0 and self.closed then
 				return nil
 		end
@@ -69,7 +66,6 @@ function pipeOutputMethods:read(count)
 end
 
 function pipeOutputMethods:close()
-		yield()
 		if not self.buffer then
 				return false
 		end

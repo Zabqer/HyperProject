@@ -11,6 +11,8 @@ cy = 1
 scx = 1
 scy = 1
 
+component.invoke(gpu, "bind", screen)
+
 local w, h = component.invoke(gpu, "maxResolution")
 
 deffg = 0xFFFFFF
@@ -18,8 +20,6 @@ defbg = 0x000000
 
 fg = deffg
 bg = defbg
-
-component.invoke(gpu, "bind", screen)
 
 component.invoke(gpu, "setResolution", w, h)
 

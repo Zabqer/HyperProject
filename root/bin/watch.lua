@@ -11,5 +11,5 @@ end)
 while true do
 	term.clear()
 	assert(sh.execute(table.concat(args, " ")))
-	os.sleep(1)
+	os.sleep(5)
 end

@@ -4,6 +4,9 @@ local term = require("term")
 local currentUser = thread.thisProcess().info().user
 
 function processTree(th, a, b)
+	if th == nil then
+		return
+	end
 	info = th:info()
 	if not info.process then
 		term.lightgreenFg()

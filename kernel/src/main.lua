@@ -93,20 +93,20 @@ function main(...)
 		init.workingDirectory = "/"
 		kernelLog(Log.DEBUG, "[main] Starting thread handling loop")
 
-		assert(filesystem.makeDirectory("/var/log"))
+		-- assert(filesystem.makeDirectory("/var/log"))
 		-- debugFs()
 
-		local logf, reason = filesystem.open("/var/log/kernel.log", "w")
-		if not logf then
-			panic(reason)
-		end
+		-- local logf, reason = filesystem.open("/var/log/kernel.log", "w")
+		-- if not logf then
+		-- 	panic(reason)
+		-- end
 		-- debugFs()
 
-		logf:write(kernelLogger.buffer)
-		-- debugFs()
+		-- logf:write(kernelLogger.buffer)
+		-- -- debugFs()
 		kernelLogger = {
 			write = function (_, data)
-				logf:write(data .. "\n")
+				-- logf:write(data .. "\n")
 			end
 		}
 		init.stdout = kernelLogger
@@ -121,7 +121,7 @@ function main(...)
 		end
 
 		function resumeThread(thread, resumeArguments)
-			kernelLog(Log.DEBUG, "Resume thread", thread.name, table.unpack(resumeArguments))
+			kernelLog(Log.DEBUG, "Resume thread", thread.name, thread.pid, table.unpack(resumeArguments))
 			thread.deadline = math.huge
 			thread.running = true
 			thisThread = thread
@@ -140,7 +140,8 @@ function main(...)
 		function checkAwaiting(thread, event)
 			if thread.awaiting == event[1] then
 				if thread.awaitingArgs ~= nil then
-					for i, arg in ipairs(thread.awaitingArgs) do
+					for i=1, #thread.awaitingArgs do
+						arg = thread.awaitingArgs[i]
 						if arg ~= nil and arg ~= event[i + 1] then
 							return false
 						end
